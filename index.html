@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%239a3f09'/%3E%3C/svg%3E" />
+    <title>Où marcher à l’ombre — Paris, 25 juin 2026</title>
+    <meta
+      name="description"
+      content="Ombre des immeubles à Paris, heure par heure, le 25 juin 2026, jour à 41 °C à la station Luxembourg."
+    />
+  </head>
+  <body>
+    <a class="skip" href="#carte">Aller à la carte</a>
+    <div id="carte" role="region" aria-label="Carte de l’ombre des immeubles à Paris"></div>
+
+    <article id="recit">
+      <div class="heure-bloc">
+        <div class="heure-ligne">
+          <button type="button" id="precedent" aria-label="Heure précédente">←</button>
+          <p class="heure" id="heure-lue"><span id="heure-nombre">16</span>&nbsp;h</p>
+          <button type="button" id="suivant" aria-label="Heure suivante">→</button>
+        </div>
+        <label class="range-label" for="heure">Heure</label>
+        <input id="heure" type="range" min="7" max="21" step="1" value="16" />
+        <div class="ticks" aria-hidden="true"><span>7</span><span>12</span><span>16</span><span>21</span></div>
+      </div>
+
+      <div class="saison" role="group" aria-label="Saison">
+        <button type="button" id="saison-ete" aria-pressed="true">Été</button>
+        <button type="button" id="saison-hiver" aria-pressed="false">Hiver</button>
+      </div>
+
+      <div class="trajet-actions">
+        <button type="button" id="poser-a" aria-label="Poser A au centre">A</button>
+        <button type="button" id="poser-b" aria-label="Poser B au centre">B</button>
+        <button type="button" id="effacer">Effacer</button>
+      </div>
+      <p class="trajet-resultat" id="trajet-resultat" aria-live="polite">Chargement de Paris…</p>
+      <p class="phrase">Ombre des immeubles, ciel dégagé, 41&nbsp;°C ce jour-là à Luxembourg.</p>
+
+      <div class="cle" id="cle">
+        <span class="sr-only">Dégradé de la part d’ombre, de 0&nbsp;% au soleil à 100&nbsp;% à l’ombre. Ce n’est pas une température.</span>
+        <span class="degrade" aria-hidden="true"></span>
+        <span class="deg-labels" aria-hidden="true"><span>0&nbsp;%</span><span>part d’ombre</span><span>100&nbsp;%</span></span>
+      </div>
+    </article>
+
+    <p id="direct" class="sr-only" aria-live="polite"></p>
+
+    <dialog id="methode">
+      <article>
+        <header>
+          <h2>Comment c’est calculé</h2>
+          <button type="button" id="fermer-methode">Fermer</button>
+        </header>
+        <div id="methode-corps"></div>
+      </article>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
