@@ -100,3 +100,38 @@ export function pct(value) {
   if (value == null || value < 0) return "—";
   return `${Math.round(value * 100)}\u202f%`;
 }
+
+function windowMean(row, from, to) {
+  const values = [];
+  for (let hour = from; hour <= to; hour++) values.push(row.shade[HOURS.indexOf(hour)]);
+  const ok = values.filter((v) => v >= 0);
+  if (!ok.length) return null;
+  return ok.reduce((a, b) => a + b, 0) / ok.length;
+}
+
+export function advice(row, kind, hour) {
+  const now = row.shade[HOURS.indexOf(hour)];
+  const nowPct = pct(now);
+  const state = band(now);
+  const tag = state === "ombre" ? "À l’ombre" : state === "soleil" ? "Au soleil" : "Partagé";
+  const bike = row.velo ? " Une bande cyclable y est indiquée." : "";
+  if (kind === "stay") {
+    return {
+      tag,
+      state,
+      text: `${row.name}. À ${hour}\u00a0h, ${nowPct} de l’axe est à l’ombre. De 12\u00a0h à 17\u00a0h, la moyenne est ${pct(windowMean(row, 12, 17))} : on peut y rester.${bike}`,
+    };
+  }
+  if (kind === "cross") {
+    return {
+      tag,
+      state,
+      text: `${row.name}. À ${hour}\u00a0h, ${nowPct} de l’axe est à l’ombre. De 12\u00a0h à 16\u00a0h, la moyenne tombe à ${pct(windowMean(row, 12, 16))} : on traverse, on ne s’attarde pas.${bike}`,
+    };
+  }
+  return {
+    tag,
+    state,
+    text: `${row.name}. ${pct(row.morning)} d’ombre entre 8\u00a0h et 10\u00a0h, ${pct(row.late)} entre 16\u00a0h et 18\u00a0h. À ${hour}\u00a0h\u00a0: ${nowPct}.${bike}`,
+  };
+}
