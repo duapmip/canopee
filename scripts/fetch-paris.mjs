@@ -1,93 +1,111 @@
 /**
- * Télécharge les bâtiments (hauteur) et les tronçons de route de tout le
- * département 75, plus une marge, depuis le WFS Géoplateforme.
- * Chaque page est écrite dans data/raw/paris/ et reprise si elle existe déjà.
+ * Télécharge les bâtiments et les tronçons BD TOPO du département 75.
+ * Les pages déjà écrites sont reprises. Rien n’est simplifié ici.
  */
-const ROOT = new URL("../", import.meta.url);
-const OUT = new URL("data/raw/paris/", ROOT);
-const WFS = "https://data.geopf.fr/wfs/ows";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const BBOX = [2.2, 48.8, 2.48, 48.92];
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const dir = path.join(root, "data", "raw", "paris");
+mkdirSync(path.join(dir, "bat"), { recursive: true });
+mkdirSync(path.join(dir, "rue"), { recursive: true });
+
+const BBOX = "2.224217,48.815562,2.469851,48.902148,EPSG:4326";
 const COUNT = 1000;
 const PARALLEL = 4;
 
-async function page(typeName, start, propertyName) {
-  const url = new URL(WFS);
-  url.searchParams.set("SERVICE", "WFS");
-  url.searchParams.set("VERSION", "2.0.0");
-  url.searchParams.set("REQUEST", "GetFeature");
-  url.searchParams.set("TYPENAMES", typeName);
-  url.searchParams.set("SRSNAME", "EPSG:4326");
-  url.searchParams.set("OUTPUTFORMAT", "application/json");
-  url.searchParams.set("BBOX", `${BBOX.join(",")},EPSG:4326`);
-  url.searchParams.set("COUNT", String(COUNT));
-  url.searchParams.set("STARTINDEX", String(start));
-  if (propertyName) url.searchParams.set("PROPERTYNAME", propertyName);
-  let last = null;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const res = await fetch(url);
-    if (res.ok) return res.json();
-    last = `${res.status} ${await res.text()}`;
-    if (res.status !== 429 && res.status < 500) break;
-    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
-  }
-  throw new Error(last);
+const layers = [
+  {
+    name: "bat",
+    type: "BDTOPO_V3:batiment",
+    props: "hauteur,geometrie",
+  },
+  {
+    name: "rue",
+    type: "BDTOPO_V3:troncon_de_route",
+    props: "geometrie,nom_voie_ban_gauche,nom_voie_ban_droite,insee_commune_gauche,insee_commune_droite,position_par_rapport_au_sol,prive,importance,nature,fictif",
+  },
+];
+
+function pageUrl(layer, start) {
+  const q = [
+    "SERVICE=WFS",
+    "VERSION=2.0.0",
+    "REQUEST=GetFeature",
+    `TYPENAMES=${layer.type}`,
+    `BBOX=${BBOX}`,
+    "SRSNAME=EPSG:4326",
+    `COUNT=${COUNT}`,
+    `STARTINDEX=${start}`,
+    "OUTPUTFORMAT=application/json",
+    `PROPERTYNAME=${layer.props}`,
+  ].join("&");
+  return `https://data.geopf.fr/wfs/ows?${q}`;
 }
 
-async function download(typeName, propertyName, dirName) {
-  const dir = new URL(`${dirName}/`, OUT);
-  await import("node:fs/promises").then((fs) => fs.mkdir(dir, { recursive: true }));
-  const first = await page(typeName, 0, propertyName);
-  const total = Number(first.numberMatched);
-  const pages = Math.ceil(total / COUNT);
-  const fs = await import("node:fs/promises");
-  const target0 = new URL("page-000.json", dir);
-  await fs.writeFile(target0, JSON.stringify(first));
-  console.log(`${dirName} ${total} objets, ${pages} pages`);
+function isCached(file) {
+  if (!existsSync(file) || statSync(file).size < 200) return false;
+  const head = readFileSync(file, "utf8").slice(0, 80);
+  return head.includes("{") && head.includes("Feature");
+}
 
-  let next = 1;
-  async function worker() {
-    for (;;) {
-      const i = next++;
-      if (i >= pages) return;
-      const target = new URL(`page-${String(i).padStart(3, "0")}.json`, dir);
-      try {
-        const existing = await fs.readFile(target, "utf8");
-        if (existing.includes('"features"')) {
-          console.log(`${dirName} page ${i + 1}/${pages} déjà là`);
-          continue;
-        }
-      } catch {
-        /* à télécharger */
-      }
-      const json = await page(typeName, i * COUNT, propertyName);
-      await fs.writeFile(target, JSON.stringify(json));
-      console.log(`${dirName} page ${i + 1}/${pages}`);
+async function pull(url, file) {
+  if (isCached(file)) {
+    const json = JSON.parse(readFileSync(file, "utf8"));
+    return json;
+  }
+  let last = "";
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    const res = await fetch(url, { headers: { "User-Agent": "ombre-paris/1.0 (hackathon mobilites)" } });
+    if (res.status === 429 || res.status >= 500) {
+      last = `${res.status}`;
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+      continue;
+    }
+    if (!res.ok) throw new Error(`${url} → ${res.status}`);
+    const text = await res.text();
+    if (!text.includes('"features"')) {
+      last = text.slice(0, 180);
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+      continue;
+    }
+    writeFileSync(file, text);
+    return JSON.parse(text);
+  }
+  throw new Error(`abandon ${file} (${last})`);
+}
+
+async function pool(jobs, worker) {
+  let cursor = 0;
+  async function run() {
+    while (cursor < jobs.length) {
+      const job = jobs[cursor++];
+      await worker(job);
     }
   }
-  await Promise.all(Array.from({ length: PARALLEL }, worker));
+  await Promise.all(Array.from({ length: PARALLEL }, run));
 }
 
-const deptUrl = new URL(
-  `${WFS}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=ADMINEXPRESS-COG.LATEST:departement&SRSNAME=EPSG:4326&OUTPUTFORMAT=application/json&CQL_FILTER=${encodeURIComponent("code_insee='75'")}`,
-);
-const fs = await import("node:fs/promises");
-await fs.mkdir(OUT, { recursive: true });
-const deptPath = new URL("departement.json", OUT);
-try {
-  const existing = JSON.parse(await fs.readFile(deptPath, "utf8"));
-  if (!existing.features?.[0]?.geometry) throw new Error("vide");
-  console.log("contour du 75 déjà là");
-} catch {
-  const res = await fetch(deptUrl);
-  if (!res.ok) throw new Error(await res.text());
-  await fs.writeFile(deptPath, JSON.stringify(await res.json()));
-  console.log("contour du 75 écrit");
+for (const layer of layers) {
+  const first = await pull(pageUrl(layer, 0), path.join(dir, layer.name, "000000.json"));
+  const matched = first.numberMatched ?? first.features.length;
+  const pages = Math.ceil(matched / COUNT);
+  console.log(`${layer.name} ${matched} objets, ${pages} pages`);
+  let done = 1;
+  const jobs = [];
+  for (let i = 1; i < pages; i++) jobs.push(i);
+  const t0 = Date.now();
+  await pool(jobs, async (i) => {
+    const start = i * COUNT;
+    const file = path.join(dir, layer.name, `${String(start).padStart(6, "0")}.json`);
+    const json = await pull(pageUrl(layer, start), file);
+    done++;
+    if (done % 10 === 0 || done === pages) {
+      const min = ((Date.now() - t0) / 60000).toFixed(1);
+      console.log(`${layer.name} ${done}/${pages} (${min} min)`);
+    }
+    if (!json.features) throw new Error(`page vide ${file}`);
+  });
+  console.log(`${layer.name} terminé`);
 }
-
-await download("BDTOPO_V3:batiment", "hauteur,geometrie", "bat");
-await download(
-  "BDTOPO_V3:troncon_de_route",
-  "geometrie,nom_voie_ban_gauche,nom_voie_ban_droite,insee_commune_gauche,insee_commune_droite,position_par_rapport_au_sol,prive,importance,nature,fictif",
-  "rue",
-);
