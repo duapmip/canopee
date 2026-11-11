@@ -2,7 +2,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@fontsource/source-sans-3/latin-400.css";
 import "@fontsource/source-sans-3/latin-600.css";
 import "@fontsource/source-sans-3/latin-700.css";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import { pct } from "./annotations.js";
 import { createRouter, indexBuildings } from "./router.js";
 import "./style.css";
