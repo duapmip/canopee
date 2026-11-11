@@ -11,9 +11,28 @@ const dir = path.join(root, "data", "raw", "paris");
 mkdirSync(path.join(dir, "bat"), { recursive: true });
 mkdirSync(path.join(dir, "rue"), { recursive: true });
 
+const boundaryFile = path.join(dir, "departement.json");
+if (!existsSync(boundaryFile)) {
+  const response = await fetch("https://geo.api.gouv.fr/communes/75056?fields=contour&format=geojson&geometry=contour");
+  if (!response.ok) throw new Error(`contour de Paris → ${response.status}`);
+  const feature = await response.json();
+  if (feature.geometry?.type === "Polygon") {
+    feature.geometry = { type: "MultiPolygon", coordinates: [feature.geometry.coordinates] };
+  }
+  if (feature.geometry?.type !== "MultiPolygon") throw new Error("contour de Paris invalide");
+  writeFileSync(boundaryFile, JSON.stringify({ type: "FeatureCollection", features: [feature] }));
+}
+
+const meteoFile = path.join(root, "data", "raw", "H_75_latest.csv.gz");
+if (!existsSync(meteoFile)) {
+  const response = await fetch("https://meteofrance.s3.sbg.io.cloud.ovh.net/data/synchro_ftp/BASE/HOR/H_75_latest-2025-2026.csv.gz");
+  if (!response.ok) throw new Error(`données Météo-France → ${response.status}`);
+  writeFileSync(meteoFile, Buffer.from(await response.arrayBuffer()));
+}
+
 const BBOX = "2.224217,48.815562,2.469851,48.902148,EPSG:4326";
 const COUNT = 1000;
-const PARALLEL = 4;
+const PARALLEL = 16;
 
 const layers = [
   {

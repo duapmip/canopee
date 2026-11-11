@@ -1,7 +1,6 @@
 node_modules
 dist
 data/raw
-public/data
 .env
 .env.*
 .DS_Store

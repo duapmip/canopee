@@ -15,13 +15,20 @@ function gapMeters(lon, lat, lon2, lat2) {
   return Math.hypot((lon - lon2) * M_LON, (lat - lat2) * M_LAT);
 }
 
-export function createRouter(buffer, inside) {
+export function createRouter(buffer, inside, treeBuffer) {
   const view = new DataView(buffer);
   const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
   if (magic !== "OMB2") throw new Error(`axes.bin illisible (${magic})`);
   const nEdges = view.getUint32(40, true);
   const nNodes = view.getUint32(44, true);
   const nChunks = view.getUint32(48, true);
+  const treeView = new DataView(treeBuffer);
+  const treeMagic = String.fromCharCode(...new Uint8Array(treeBuffer, 0, 4));
+  if (treeMagic !== "TREE" || treeView.getUint32(4, true) !== nEdges) {
+    throw new Error("tree-cover.bin incompatible avec axes.bin");
+  }
+  const treeToday = new Uint8Array(treeBuffer, 8, nEdges);
+  const treeFuture = new Uint8Array(treeBuffer, 8 + nEdges, nEdges);
   let o = 64;
   const from = new Int32Array(buffer, o, nEdges);
   o += nEdges * 4;
@@ -97,19 +104,28 @@ export function createRouter(buffer, inside) {
   const prevStamp = new Int32Array(nNodes + 2);
   let generation = 1;
 
-  function share(edge, hourIndex, season) {
+  function share(edge, hourIndex, season, future = false) {
     const table = season === "hiver" ? winter : shade;
     const v = table[edge * 15 + hourIndex];
-    return v === 255 ? -1 : v / 100;
+    if (v === 255) return -1;
+    const base = v / 100;
+    if (season === "hiver") return base;
+    const cover = (future ? treeFuture[edge] : treeToday[edge]) / 100;
+    return 1 - (1 - base) * (1 - cover);
   }
 
-  function meanChunk(c, hourIndex, season) {
+  function gain(edge, hourIndex, season) {
+    if (season === "hiver" || shade[edge * 15 + hourIndex] === 255) return 0;
+    return share(edge, hourIndex, season, true) - share(edge, hourIndex, season, false);
+  }
+
+  function meanChunk(c, hourIndex, season, future) {
     const start = chunkStart[c];
     const count = chunkCount[c];
     let sum = 0;
     let n = 0;
     for (let k = 0; k < count; k++) {
-      const s = share(start + k, hourIndex, season);
+      const s = share(start + k, hourIndex, season, future);
       if (s < 0) continue;
       sum += s;
       n++;
@@ -117,23 +133,32 @@ export function createRouter(buffer, inside) {
     return n ? sum / n : -1;
   }
 
-  function featuresFrom(coordsList, values) {
+  function featuresFrom(coordsList, values, gains) {
     const features = [];
     for (let i = 0; i < coordsList.length; i++) {
       if (values[i] < 0) continue;
       features.push({
         type: "Feature",
-        properties: { s: values[i] },
+        properties: { s: values[i], g: gains[i] },
         geometry: { type: "LineString", coordinates: coordsList[i] },
       });
     }
     return { type: "FeatureCollection", features };
   }
 
-  function farCollection(hourIndex, season) {
+  function farCollection(hourIndex, season, future = false) {
     const values = new Array(nChunks);
-    for (let c = 0; c < nChunks; c++) values[c] = meanChunk(c, hourIndex, season);
-    return featuresFrom(chunkCoords, values);
+    const gains = new Array(nChunks).fill(0);
+    for (let c = 0; c < nChunks; c++) {
+      values[c] = meanChunk(c, hourIndex, season, future);
+      if (future && season === "ete") {
+        const start = chunkStart[c];
+        const count = chunkCount[c];
+        for (let k = 0; k < count; k++) gains[c] += gain(start + k, hourIndex, season);
+        gains[c] /= count;
+      }
+    }
+    return featuresFrom(chunkCoords, values, gains);
   }
 
   function edgesIn(bounds) {
@@ -163,14 +188,14 @@ export function createRouter(buffer, inside) {
     return ids.length > 14000 ? null : ids;
   }
 
-  function nearCollection(ids, hourIndex, season) {
+  function nearCollection(ids, hourIndex, season, future = false) {
     const features = [];
     for (const e of ids) {
-      const s = share(e, hourIndex, season);
+      const s = share(e, hourIndex, season, future);
       if (s < 0) continue;
       features.push({
         type: "Feature",
-        properties: { s },
+        properties: { s, g: future ? gain(e, hourIndex, season) : 0 },
         geometry: {
           type: "LineString",
           coordinates: [
@@ -181,6 +206,33 @@ export function createRouter(buffer, inside) {
       });
     }
     return { type: "FeatureCollection", features };
+  }
+
+  function shadeAround(lon, lat, radiusMeters, hourIndex, season, future = false) {
+    const lonRadius = radiusMeters / M_LON;
+    const latRadius = radiusMeters / M_LAT;
+    const x0 = Math.floor((lon - lonRadius) / CELL);
+    const x1 = Math.floor((lon + lonRadius) / CELL);
+    const y0 = Math.floor((lat - latRadius) / CELL);
+    const y1 = Math.floor((lat + latRadius) / CELL);
+    let known = 0;
+    let shaded = 0;
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        const list = buckets.get(`${x},${y}`);
+        if (!list) continue;
+        for (const edge of list) {
+          const midLon = (ax[edge] + bx[edge]) / 2;
+          const midLat = (ay[edge] + by[edge]) / 2;
+          if (gapMeters(lon, lat, midLon, midLat) > radiusMeters) continue;
+          const s = share(edge, hourIndex, season, future);
+          if (s < 0) continue;
+          known += len[edge];
+          shaded += s * len[edge];
+        }
+      }
+    }
+    return known ? shaded / known : null;
   }
 
   function project(edge, lon, lat) {
@@ -214,7 +266,7 @@ export function createRouter(buffer, inside) {
     return { ok: true, lon: best.lon, lat: best.lat, t: best.t, edge: best.edge, gap: best.gap };
   }
 
-  function plan(lonA, latA, lonB, latB, season, hourIndex) {
+  function plan(lonA, latA, lonB, latB, season, hourIndex, future = false) {
     const a = snap(lonA, latA);
     if (!a.ok) return a;
     const b = snap(lonB, latB);
@@ -232,7 +284,7 @@ export function createRouter(buffer, inside) {
     const sunUp = table[a.edge * 15 + hourIndex] !== 255;
     const factor = (edge) => {
       if (!sunUp) return 1;
-      const frac = table[edge * 15 + hourIndex] / 100;
+      const frac = share(edge, hourIndex, season, future);
       const exposure = season === "hiver" ? frac : 1 - frac;
       return 1 + PREFERENCE * exposure;
     };
@@ -363,6 +415,7 @@ export function createRouter(buffer, inside) {
     let length = 0;
     let known = 0;
     let shaded = 0;
+    let shadedToday = 0;
     for (let i = 1; i < chain.length; i++) {
       const edge = prevEdge[chain[i]];
       const t0 = tOf(chain[i - 1], edge);
@@ -370,7 +423,7 @@ export function createRouter(buffer, inside) {
       if (t0 == null || t1 == null) continue;
       const portion = Math.abs(t1 - t0) * len[edge];
       if (portion < 0.4) continue;
-      const s = share(edge, hourIndex, season);
+      const s = share(edge, hourIndex, season, future);
       const lon0 = ax[edge] + (bx[edge] - ax[edge]) * t0;
       const lat0 = ay[edge] + (by[edge] - ay[edge]) * t0;
       const lon1 = ax[edge] + (bx[edge] - ax[edge]) * t1;
@@ -387,6 +440,7 @@ export function createRouter(buffer, inside) {
       if (s >= 0) {
         known += portion;
         shaded += s * portion;
+        shadedToday += share(edge, hourIndex, season, false) * portion;
       }
     }
     return {
@@ -397,10 +451,11 @@ export function createRouter(buffer, inside) {
       segments,
       length,
       shade: known > 0 ? shaded / known : null,
+      todayShade: known > 0 ? shadedToday / known : null,
     };
   }
 
-  return { nEdges, nChunks, farCollection, edgesIn, nearCollection, snap, plan };
+  return { nEdges, nChunks, farCollection, edgesIn, nearCollection, shadeAround, snap, plan };
 }
 
 export function indexBuildings(buffer) {

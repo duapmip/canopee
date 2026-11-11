@@ -6,7 +6,7 @@
  * Entrées : data/raw/paris/bat/*.json, data/raw/paris/rue/*.json,
  * data/raw/paris/departement.json (produits par scripts/fetch-paris.mjs).
  */
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,7 @@ import { degrees, sunPosition } from "../src/sun.js";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const rawDir = path.join(root, "data", "raw", "paris");
 const outDir = path.join(root, "public", "data");
+mkdirSync(outDir, { recursive: true });
 
 const SOUTH = 48.81556224;
 const NORTH = 48.90214759;

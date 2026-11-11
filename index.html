@@ -4,17 +4,73 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%239a3f09'/%3E%3C/svg%3E" />
-    <title>Où marcher à l’ombre — Paris, 25 juin 2026</title>
+    <title>Canopée — Paris face à la chaleur</title>
     <meta
       name="description"
-      content="Ombre des immeubles à Paris, heure par heure, le 25 juin 2026, jour à 41 °C à la station Luxembourg."
+      content="Carte des rues ombragées, fontaines et lieux frais à Paris, avec itinéraire piéton et scénario d'adaptation."
     />
   </head>
   <body>
     <a class="skip" href="#carte">Aller à la carte</a>
-    <div id="carte" role="region" aria-label="Carte de l’ombre des immeubles à Paris"></div>
+    <div id="carte" role="region" aria-label="Carte de l’ombre et de la canopée à Paris"></div>
 
     <article id="recit">
+      <header class="intro">
+        <p class="kicker">Paris · mobilité & chaleur</p>
+        <h1>Canopée</h1>
+        <p class="dek">Où marcher quand la ville chauffe&nbsp;?</p>
+      </header>
+
+      <section class="itineraire" aria-labelledby="itineraire-titre">
+        <h2 id="itineraire-titre">Votre trajet à l’ombre</h2>
+        <p>À pied, avec les fontaines et lieux frais sur le chemin.</p>
+        <form id="form-a" class="adresse-form">
+          <label for="adresse-a">Départ</label>
+          <div class="adresse-ligne"><input id="adresse-a" type="search" placeholder="Adresse de départ à Paris" required autocomplete="street-address" /><button type="submit" aria-label="Chercher le départ">→</button></div>
+          <div id="choix-a" class="choix-adresse" aria-live="polite"></div>
+        </form>
+        <form id="form-b" class="adresse-form">
+          <label for="adresse-b">Destination</label>
+          <div class="adresse-ligne"><input id="adresse-b" type="search" placeholder="Adresse d’arrivée à Paris" required autocomplete="street-address" /><button type="submit" aria-label="Chercher la destination">→</button></div>
+          <div id="choix-b" class="choix-adresse" aria-live="polite"></div>
+        </form>
+        <details class="points-carte">
+          <summary>Ou choisir des points sur la carte</summary>
+          <div class="trajet-actions">
+            <button type="button" id="poser-a" aria-label="Poser A au centre">A</button>
+            <button type="button" id="poser-b" aria-label="Poser B au centre">B</button>
+            <button type="button" id="effacer">Effacer</button>
+          </div>
+        </details>
+        <div class="trajet-synthese">
+          <p class="trajet-resultat" id="trajet-resultat" aria-live="polite">Chargement de Paris…</p>
+          <p class="trajet-contexte" id="trajet-contexte"></p>
+        </div>
+      </section>
+
+      <div class="horizon" role="group" aria-label="Horizon de la carte">
+        <button type="button" id="vue-aujourdhui" aria-pressed="true">Aujourd’hui</button>
+        <button type="button" id="vue-future" aria-pressed="false">Vers 2036</button>
+      </div>
+      <p class="vue-explication" id="vue-explication">Ombre des bâtiments calculée et couverture des arbres recensés estimée pour le 25 juin 2026. Fontaines et lieux frais observés.</p>
+
+      <section class="observatoire" aria-labelledby="observatoire-titre">
+        <h2 id="observatoire-titre">Les abords des stations</h2>
+        <p>Où manque-t-il de l’ombre, de l’eau ou un lieu frais pour rejoindre les transports&nbsp;?</p>
+        <div class="constats" id="constats" aria-live="polite"></div>
+        <details class="stations-lecture">
+          <summary>Explorer les stations en texte</summary>
+          <p class="methode-courte">Trois points d’attention possibles&nbsp;: moins de 40&nbsp;% d’ombre sur les rues à 250&nbsp;m, fontaine à plus de 350&nbsp;m, lieu frais à plus de 300&nbsp;m. Distances à vol d’oiseau, seuils exploratoires.</p>
+          <label for="chercher-station">Rechercher une station</label>
+          <input id="chercher-station" type="search" placeholder="Nom de station" autocomplete="off" />
+          <p id="stations-compte" class="stations-compte"></p>
+          <ol id="stations-liste" class="stations-liste"></ol>
+          <button type="button" id="stations-toutes" class="stations-toutes">Afficher toutes les stations</button>
+        </details>
+      </section>
+
+      <details class="reglages" open>
+        <summary>Heure, saison et couches</summary>
       <div class="heure-bloc">
         <div class="heure-ligne">
           <button type="button" id="precedent" aria-label="Heure précédente">←</button>
@@ -31,19 +87,23 @@
         <button type="button" id="saison-hiver" aria-pressed="false">Hiver</button>
       </div>
 
-      <div class="trajet-actions">
-        <button type="button" id="poser-a" aria-label="Poser A au centre">A</button>
-        <button type="button" id="poser-b" aria-label="Poser B au centre">B</button>
-        <button type="button" id="effacer">Effacer</button>
-      </div>
-      <p class="trajet-resultat" id="trajet-resultat" aria-live="polite">Chargement de Paris…</p>
-      <p class="phrase">Ombre des immeubles, ciel dégagé, 41&nbsp;°C ce jour-là à Luxembourg.</p>
+      <fieldset class="couches">
+        <legend>Afficher sur la carte</legend>
+        <label><input id="couche-eau" type="checkbox" checked /> <span class="pastille eau" aria-hidden="true"></span> Fontaines</label>
+        <label><input id="couche-frais" type="checkbox" checked /> <span class="pastille frais" aria-hidden="true"></span> Lieux frais</label>
+        <label><input id="couche-parcs" type="checkbox" checked /> <span class="pastille parc" aria-hidden="true"></span> Espaces verts ombragés</label>
+        <label><input id="couche-stations" type="checkbox" checked /> <span class="pastille station" aria-hidden="true">2</span> Stations (points d’attention)</label>
+        <p class="zoom-note">Zoomez pour voir les lieux individuels.</p>
+      </fieldset>
+      <p class="phrase">Ombre des bâtiments et canopée estimée en été, ciel dégagé. 41&nbsp;°C ce jour-là à Luxembourg.</p>
 
       <div class="cle" id="cle">
         <span class="sr-only">Dégradé de la part d’ombre, de 0&nbsp;% au soleil à 100&nbsp;% à l’ombre. Ce n’est pas une température.</span>
         <span class="degrade" aria-hidden="true"></span>
         <span class="deg-labels" aria-hidden="true"><span>0&nbsp;%</span><span>part d’ombre</span><span>100&nbsp;%</span></span>
       </div>
+      </details>
+      <button type="button" class="methode-trigger" id="ouvrir-methode">Sources et méthode</button>
     </article>
 
     <p id="direct" class="sr-only" aria-live="polite"></p>
