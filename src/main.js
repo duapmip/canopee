@@ -314,7 +314,7 @@ map.on("load", () => {
       filter: ["==", ["get", "category"], category],
       layout: {
         "icon-image": icon,
-        "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.75, 16, 1.1],
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 13, category === "water" ? 0.95 : 0.75, 16, category === "water" ? 1.25 : 1.1],
         "icon-allow-overlap": false,
         "icon-padding": 2,
       },

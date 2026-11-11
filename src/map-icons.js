@@ -29,23 +29,24 @@ function fountain(ctx, phase = 0) {
     ctx.lineWidth = 2.2;
     ctx.stroke();
   }
-  disc(ctx, "#f7fdff", "#0878ad");
-  ctx.strokeStyle = "#075c88";
-  ctx.lineWidth = 1.9;
-  ctx.lineCap = "round";
+  disc(ctx, "#0878ad");
+  ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.moveTo(9.5, 20);
-  ctx.quadraticCurveTo(16, 23.7, 22.5, 20);
-  ctx.moveTo(12, 23);
-  ctx.lineTo(20, 23);
-  ctx.moveTo(16, 23);
-  ctx.lineTo(16, 25);
-  ctx.moveTo(12, 13);
-  ctx.quadraticCurveTo(16, 8.5, 20, 13);
-  ctx.stroke();
-  ctx.fillStyle = "#1e9fd1";
+  ctx.roundRect(8, 10, 13, 3.2, 1.2);
+  ctx.roundRect(19, 11, 3, 4.5, 0.8);
+  ctx.roundRect(13.5, 8, 2, 2.5, 0.5);
+  ctx.roundRect(11, 6.8, 7, 1.8, 0.8);
+  ctx.fill();
   ctx.beginPath();
-  ctx.arc(16, 14.5 + phase * 3.3, 1.55, 0, Math.PI * 2);
+  ctx.moveTo(11, 20.5);
+  ctx.lineTo(24, 20.5);
+  ctx.lineTo(22.5, 24.5);
+  ctx.lineTo(12.5, 24.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#b6eeff";
+  ctx.beginPath();
+  ctx.arc(20.5, 16.5 + phase * 3.1, 1.5, 0, Math.PI * 2);
   ctx.fill();
 }
 
