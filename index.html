@@ -16,14 +16,15 @@
 
     <article id="recit">
       <header class="intro">
-        <p class="kicker">Paris · mobilité & chaleur</p>
-        <h1>Canopée</h1>
-        <p class="dek">Où marcher quand la ville chauffe&nbsp;?</p>
+        <div class="hero-soleil" aria-hidden="true"><span></span></div>
+        <p class="kicker"><span class="marque-feuille" aria-hidden="true">✳</span> CANOPÉE <span class="kicker-sep">/</span> PARIS</p>
+        <h1>La fraîcheur<br />en chemin<span class="titre-point">.</span></h1>
+        <p class="dek">L’ombre, l’eau et les refuges pour traverser Paris à pied.</p>
       </header>
 
       <section class="itineraire" aria-labelledby="itineraire-titre">
-        <h2 id="itineraire-titre">Votre trajet à l’ombre</h2>
-        <p>À pied, avec les fontaines et lieux frais sur le chemin.</p>
+        <div class="section-titre"><span class="section-numero">01</span><h2 id="itineraire-titre">Votre trajet à l’ombre</h2></div>
+        <p class="section-sous-titre">Où allez-vous&nbsp;?</p>
         <form id="form-a" class="adresse-form">
           <label for="adresse-a">Départ</label>
           <div class="adresse-ligne"><input id="adresse-a" type="search" placeholder="Adresse de départ à Paris" required autocomplete="street-address" /><button type="submit" aria-label="Chercher le départ">→</button></div>
@@ -48,18 +49,20 @@
         </div>
       </section>
 
-      <div class="horizon" role="group" aria-label="Horizon de la carte">
-        <button type="button" id="vue-aujourdhui" aria-pressed="true">Aujourd’hui</button>
-        <button type="button" id="vue-future" aria-pressed="false">Vers 2036</button>
-      </div>
-      <p class="vue-explication" id="vue-explication">Ombre des bâtiments calculée et couverture des arbres recensés estimée pour le 25 juin 2026. Fontaines et lieux frais observés.</p>
+      <section class="horizon-section" aria-label="Comparer les horizons">
+        <div class="section-titre"><span class="section-numero">02</span><h2>Explorer deux horizons</h2></div>
+        <div class="horizon" role="group" aria-label="Horizon de la carte">
+          <button type="button" id="vue-aujourdhui" aria-pressed="true"><span>2026</span><small>Aujourd’hui</small></button>
+          <button type="button" id="vue-future" aria-pressed="false"><span>2036</span><small>Scénario</small></button>
+        </div>
+        <p class="vue-explication" id="vue-explication">Ombre des bâtiments calculée et couverture des arbres recensés estimée pour le 25 juin 2026. Fontaines et lieux frais observés.</p>
+      </section>
 
       <section class="observatoire" aria-labelledby="observatoire-titre">
-        <h2 id="observatoire-titre">Les abords des stations</h2>
-        <p>Où manque-t-il de l’ombre, de l’eau ou un lieu frais pour rejoindre les transports&nbsp;?</p>
+        <div class="section-titre"><span class="section-numero">03</span><h2 id="observatoire-titre">Le constat près des stations</h2></div>
         <div class="constats" id="constats" aria-live="polite"></div>
         <details class="stations-lecture">
-          <summary>Explorer les stations en texte</summary>
+          <summary>Voir les stations et leurs données</summary>
           <p class="methode-courte">Trois points d’attention possibles&nbsp;: moins de 40&nbsp;% d’ombre sur les rues à 250&nbsp;m, fontaine à plus de 350&nbsp;m, lieu frais à plus de 300&nbsp;m. Distances à vol d’oiseau, seuils exploratoires.</p>
           <label for="chercher-station">Rechercher une station</label>
           <input id="chercher-station" type="search" placeholder="Nom de station" autocomplete="off" />
@@ -69,19 +72,8 @@
         </details>
       </section>
 
-      <details class="reglages" open>
-        <summary>Heure, saison et couches</summary>
-      <div class="heure-bloc">
-        <div class="heure-ligne">
-          <button type="button" id="precedent" aria-label="Heure précédente">←</button>
-          <p class="heure" id="heure-lue"><span id="heure-nombre">16</span>&nbsp;h</p>
-          <button type="button" id="suivant" aria-label="Heure suivante">→</button>
-        </div>
-        <label class="range-label" for="heure">Heure</label>
-        <input id="heure" type="range" min="7" max="21" step="1" value="16" />
-        <div class="ticks" aria-hidden="true"><span>7</span><span>12</span><span>16</span><span>21</span></div>
-      </div>
-
+      <details class="reglages">
+        <summary>Saison et couches de la carte</summary>
       <div class="saison" role="group" aria-label="Saison">
         <button type="button" id="saison-ete" aria-pressed="true">Été</button>
         <button type="button" id="saison-hiver" aria-pressed="false">Hiver</button>
@@ -97,14 +89,30 @@
       </fieldset>
       <p class="phrase">Ombre des bâtiments et canopée estimée en été, ciel dégagé. 41&nbsp;°C ce jour-là à Luxembourg.</p>
 
-      <div class="cle" id="cle">
-        <span class="sr-only">Dégradé de la part d’ombre, de 0&nbsp;% au soleil à 100&nbsp;% à l’ombre. Ce n’est pas une température.</span>
-        <span class="degrade" aria-hidden="true"></span>
-        <span class="deg-labels" aria-hidden="true"><span>0&nbsp;%</span><span>part d’ombre</span><span>100&nbsp;%</span></span>
-      </div>
       </details>
-      <button type="button" class="methode-trigger" id="ouvrir-methode">Sources et méthode</button>
+      <button type="button" class="methode-trigger" id="ouvrir-methode">Sources, hypothèses et limites <span aria-hidden="true">↗</span></button>
     </article>
+
+    <section class="heure-dock" aria-label="Explorer l’ombre selon l’heure">
+      <div class="dock-en-tete"><span class="dock-soleil" aria-hidden="true">✳</span><span>La ville, heure par heure</span></div>
+      <div class="heure-bloc">
+        <div class="heure-ligne">
+          <button type="button" id="precedent" aria-label="Heure précédente">←</button>
+          <p class="heure" id="heure-lue"><span id="heure-nombre">16</span>&nbsp;h</p>
+          <button type="button" id="suivant" aria-label="Heure suivante">→</button>
+        </div>
+        <label class="range-label" for="heure">Heure</label>
+        <input id="heure" type="range" min="7" max="21" step="1" value="16" />
+        <div class="ticks" aria-hidden="true"><span>7</span><span>12</span><span>16</span><span>21</span></div>
+      </div>
+    </section>
+
+    <div class="cle" id="cle" aria-label="Lecture de la couleur des rues">
+      <span class="cle-titre">Lire la carte <small id="lecture-mode">Ombre moyenne des rues par secteur</small></span>
+      <span class="sr-only">Dégradé de la part d’ombre, de 0&nbsp;% au soleil à 100&nbsp;% à l’ombre. Ce n’est pas une température.</span>
+      <span class="degrade" aria-hidden="true"></span>
+      <span class="deg-labels" aria-hidden="true"><span>☀ Exposé</span><span>Ombragé ✳</span></span>
+    </div>
 
     <p id="direct" class="sr-only" aria-live="polite"></p>
 

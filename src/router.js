@@ -10,6 +10,25 @@ const LAT0 = 48.8566;
 const LON0 = 2.3522;
 const M_LAT = 111132.92 - 559.82 * Math.cos((2 * LAT0 * Math.PI) / 180);
 const M_LON = 111412.84 * Math.cos((LAT0 * Math.PI) / 180);
+const HEX_RADIUS_M = 260;
+
+function nearestHex(lon, lat) {
+  const x = (lon - LON0) * M_LON;
+  const y = (lat - LAT0) * M_LAT;
+  const fq = (Math.sqrt(3) * x / 3 - y / 3) / HEX_RADIUS_M;
+  const fr = (2 * y / 3) / HEX_RADIUS_M;
+  let q = Math.round(fq);
+  let r = Math.round(fr);
+  const s = Math.round(-fq - fr);
+  const dq = Math.abs(q - fq);
+  const dr = Math.abs(r - fr);
+  const ds = Math.abs(s + fq + fr);
+  if (dq > dr && dq > ds) q = -r - s;
+  else if (dr > ds) r = -q - s;
+  const cx = HEX_RADIUS_M * Math.sqrt(3) * (q + r / 2);
+  const cy = HEX_RADIUS_M * 1.5 * r;
+  return { q, r, lon: LON0 + cx / M_LON, lat: LAT0 + cy / M_LAT };
+}
 
 function gapMeters(lon, lat, lon2, lat2) {
   return Math.hypot((lon - lon2) * M_LON, (lat - lat2) * M_LAT);
@@ -61,6 +80,16 @@ export function createRouter(buffer, inside, treeBuffer) {
     const coords = [[ax[start], ay[start]]];
     for (let k = 0; k < count; k++) coords.push([bx[start + k], by[start + k]]);
     chunkCoords[c] = coords;
+  }
+
+  const hexes = new Map();
+  for (let c = 0; c < nChunks; c++) {
+    const coords = chunkCoords[c];
+    const middle = coords[Math.floor(coords.length / 2)];
+    const hex = nearestHex(middle[0], middle[1]);
+    const key = `${hex.q},${hex.r}`;
+    if (!hexes.has(key)) hexes.set(key, { ...hex, chunks: [] });
+    hexes.get(key).chunks.push(c);
   }
 
   const buckets = new Map();
@@ -159,6 +188,34 @@ export function createRouter(buffer, inside, treeBuffer) {
       }
     }
     return featuresFrom(chunkCoords, values, gains);
+  }
+
+  function overviewCollection(hourIndex, season, future = false) {
+    const features = [];
+    for (const hex of hexes.values()) {
+      if (!inside(hex.lon, hex.lat)) continue;
+      let sum = 0;
+      let weight = 0;
+      for (const c of hex.chunks) {
+        const value = meanChunk(c, hourIndex, season, future);
+        if (value < 0) continue;
+        const count = chunkCount[c];
+        sum += value * count;
+        weight += count;
+      }
+      if (weight < 8) continue;
+      const ring = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 180 * (60 * i - 30);
+        ring.push([
+          hex.lon + HEX_RADIUS_M * Math.cos(angle) / M_LON,
+          hex.lat + HEX_RADIUS_M * Math.sin(angle) / M_LAT,
+        ]);
+      }
+      ring.push(ring[0]);
+      features.push({ type: "Feature", properties: { s: sum / weight }, geometry: { type: "Polygon", coordinates: [ring] } });
+    }
+    return { type: "FeatureCollection", features };
   }
 
   function edgesIn(bounds) {
@@ -455,7 +512,7 @@ export function createRouter(buffer, inside, treeBuffer) {
     };
   }
 
-  return { nEdges, nChunks, farCollection, edgesIn, nearCollection, shadeAround, snap, plan };
+  return { nEdges, nChunks, farCollection, overviewCollection, edgesIn, nearCollection, shadeAround, snap, plan };
 }
 
 export function indexBuildings(buffer) {

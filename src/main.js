@@ -24,6 +24,7 @@ let markerB = null;
 let router = null;
 let buildings = null;
 let farKey = "";
+let overviewKey = "";
 const EMPTY = { type: "FeatureCollection", features: [] };
 let amenities = EMPTY;
 let stationCollection = EMPTY;
@@ -53,15 +54,16 @@ const el = {
   stationCount: document.getElementById("stations-compte"),
   stationList: document.getElementById("stations-liste"),
   stationAll: document.getElementById("stations-toutes"),
+  mapMode: document.getElementById("lecture-mode"),
 };
 
-const SHADE_COLOR = ["interpolate", ["linear"], ["get", "s"], 0, "#d06a14", 0.5, "#8a5a3a", 1, "#0e2f46"];
+const SHADE_COLOR = ["interpolate", ["linear"], ["get", "s"], 0, "#da6840", 0.5, "#9f8172", 1, "#176778"];
 
 function padding() {
   if (window.innerWidth < 760) {
-    return { top: Math.round(window.innerHeight * 0.62), right: 10, bottom: 10, left: 10 };
+    return { top: Math.round(window.innerHeight * (window.innerWidth < 500 ? 0.5 : 0.48)), right: 10, bottom: 145, left: 10 };
   }
-  return { top: 24, right: 24, bottom: 24, left: 380 };
+  return { top: 24, right: 24, bottom: 160, left: 430 };
 }
 
 function pointInRing(lon, lat, ring) {
@@ -160,6 +162,25 @@ function paintStreets() {
   if (!router || !map.getSource("rues-loin")) return;
   const index = scene.hours.indexOf(hour);
   const zoom = map.getZoom();
+  const overview = zoom < 12.6;
+  if (map.getLayer("quartiers-ombre")) {
+    map.setLayoutProperty("quartiers-ombre", "visibility", overview ? "visible" : "none");
+    map.setLayoutProperty("quartiers-filet", "visibility", overview ? "visible" : "none");
+  }
+  el.mapMode.textContent = overview ? "Ombre moyenne des rues par secteur" : "Part d’ombre sur chaque rue";
+  if (overview) {
+    const key = `${season}:${index}:${view}`;
+    if (overviewKey !== key) {
+      map.getSource("quartiers").setData(router.overviewCollection(index, season, view === "future"));
+      overviewKey = key;
+    }
+    map.getSource("rues-pres").setData(EMPTY);
+    map.setLayoutProperty("rues-loin", "visibility", "none");
+    map.setLayoutProperty("gain-loin", "visibility", "none");
+    map.setLayoutProperty("gain-pres", "visibility", "none");
+    map.getSource("batis").setData(EMPTY);
+    return;
+  }
   const ids = zoom >= 15 ? router.edgesIn(map.getBounds()) : null;
   if (ids) {
     map.getSource("rues-pres").setData(router.nearCollection(ids, index, season, view === "future"));
@@ -197,6 +218,7 @@ map.on("load", () => {
   calmBasemap();
   map.addSource("rues-loin", { type: "geojson", data: EMPTY });
   map.addSource("rues-pres", { type: "geojson", data: EMPTY });
+  map.addSource("quartiers", { type: "geojson", data: EMPTY });
   map.addSource("batis", { type: "geojson", data: EMPTY });
   map.addSource("trajet", { type: "geojson", data: EMPTY });
   map.addSource("equipements", { type: "geojson", data: EMPTY });
@@ -209,9 +231,21 @@ map.on("load", () => {
   const add = (layer) => map.addLayer(layer, beforeLabels);
   const streetPaint = {
     "line-color": SHADE_COLOR,
-    "line-opacity": 0.94,
-    "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.15, 12, 1.9, 14.5, 3.4],
+    "line-opacity": 0.82,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.9, 12, 1.55, 14.5, 3.2],
   };
+  add({
+    id: "quartiers-ombre",
+    type: "fill",
+    source: "quartiers",
+    paint: { "fill-color": SHADE_COLOR, "fill-opacity": 0.72 },
+  });
+  add({
+    id: "quartiers-filet",
+    type: "line",
+    source: "quartiers",
+    paint: { "line-color": "#ffffff", "line-opacity": 0.7, "line-width": 0.7 },
+  });
   add({
     id: "gain-loin",
     type: "line",
@@ -399,7 +433,10 @@ window.addEventListener("resize", () => {
   const narrow = window.innerWidth < 760;
   if (narrow !== lastNarrow) {
     lastNarrow = narrow;
-    map.fitBounds(scene.bounds, { padding: padding(), duration: 0 });
+    const bounds = pointA && pointB
+      ? new maplibregl.LngLatBounds().extend(pointA).extend(pointB)
+      : scene.bounds;
+    map.fitBounds(bounds, { padding: padding(), maxZoom: 16, duration: 0 });
   }
 });
 
@@ -506,20 +543,64 @@ function renderStations() {
   const profiles = stationCollection.features.map(stationProfile);
   const lowShade = profiles.filter((p) => p.shade != null && p.shade < 40).length;
   const combined = profiles.filter((p) => p.score >= 2).length;
-  const cards = [
-    [profiles.length, "stations ferrées étudiées à Paris"],
-    [profiles.some((p) => p.shade != null) ? lowShade : "—", `avec moins de 40 % d’ombre à ${hour} h`],
-    [combined, "avec au moins 2 points d’attention"],
-  ];
-  el.insights.replaceChildren(...cards.map(([value, label]) => {
-    const card = document.createElement("div");
-    const strong = document.createElement("strong");
-    strong.textContent = String(value);
-    const span = document.createElement("span");
-    span.textContent = label;
-    card.append(strong, span);
-    return card;
-  }));
+  const count = profiles.length;
+  const index = scene.hours.indexOf(hour);
+  const countLow = (key) => stationCollection.features.filter((feature) => {
+    const shade = feature.properties[key][index];
+    return shade != null && shade < 40;
+  }).length;
+  const todayLow = season === "hiver" ? countLow("shadeWinter") : countLow("shadeToday");
+  const futureLow = season === "hiver" ? todayLow : countLow("shadeFuture");
+  const day = profiles.some((p) => p.shade != null);
+  const percentage = day ? Math.round((lowShade / count) * 100) : 0;
+  const comparison = season === "hiver"
+    ? "Croissance des arbres non simulée en hiver"
+    : `${Math.max(0, todayLow - futureLow)} station${todayLow - futureLow > 1 ? "s" : ""} passe${todayLow - futureLow > 1 ? "nt" : ""} au-dessus du seuil d’ombre en 2036`;
+  const ring = document.createElement("div");
+  ring.className = "constat-anneau";
+  ring.style.setProperty("--part", `${percentage}%`);
+  ring.innerHTML = `<span>${day ? percentage : "—"}<small>${day ? "%" : ""}</small></span>`;
+  const lead = document.createElement("div");
+  lead.className = "constat-message";
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "constat-eyebrow";
+  eyebrow.textContent = view === "future" ? "SCÉNARIO 2036" : "PARIS AUJOURD’HUI";
+  const value = document.createElement("strong");
+  value.textContent = day ? `${lowShade} stations` : "Soleil couché";
+  const desc = document.createElement("p");
+  desc.textContent = day ? `sur ${count} ont peu d’ombre autour à ${hour} h.` : "L’ombre portée n’est plus mesurée à cette heure.";
+  lead.append(eyebrow, value, desc);
+  const hero = document.createElement("div");
+  hero.className = "constat-hero";
+  hero.append(ring, lead);
+  const bars = document.createElement("div");
+  bars.className = "constat-comparaison";
+  for (const [label, value, selected] of [["Aujourd’hui", todayLow, view === "today"], ["Vers 2036", futureLow, view === "future"]]) {
+    const row = document.createElement("div");
+    row.className = `comparaison-ligne${selected ? " active" : ""}`;
+    const heading = document.createElement("span");
+    heading.textContent = label;
+    const track = document.createElement("span");
+    track.className = "comparaison-piste";
+    const fill = document.createElement("span");
+    fill.style.width = day ? `${(value / count) * 100}%` : "0%";
+    track.append(fill);
+    const amount = document.createElement("strong");
+    amount.textContent = day ? String(value) : "—";
+    row.append(heading, track, amount);
+    bars.append(row);
+  }
+  const note = document.createElement("div");
+  note.className = "constat-note";
+  const gain = document.createElement("span");
+  gain.textContent = day ? comparison : "Comparaison indisponible après le coucher du soleil";
+  const needs = document.createElement("span");
+  needs.textContent = `${combined} stations cumulent au moins 2 manques`;
+  note.append(gain, needs);
+  const method = document.createElement("p");
+  method.className = "constat-seuil";
+  method.textContent = "Peu d’ombre = moins de 40 % des rues ombragées à 250 m. Modèle exploratoire.";
+  el.insights.replaceChildren(hero, bars, note, method);
   renderStationList(profiles);
   if (map.getSource("stations")) {
     map.getSource("stations").setData({
@@ -588,13 +669,24 @@ function drawRoute(speak) {
   });
   const length = formatLength(result.length);
   const minutes = Math.max(1, Math.round(result.length / 75));
-  el.resultat.textContent = result.neutral
-    ? `${minutes} min à pied · ${length} · soleil couché`
+  const time = document.createElement("strong");
+  time.className = "result-time";
+  time.textContent = `${minutes} min`;
+  const details = document.createElement("span");
+  details.className = "result-details";
+  const distance = document.createElement("span");
+  distance.textContent = `${length} à pied`;
+  const shade = document.createElement("span");
+  shade.className = "result-shade";
+  shade.textContent = result.neutral
+    ? "Soleil couché"
     : view === "future" && season === "ete"
-      ? `${minutes} min à pied · ${length} · ombre sur ce trajet : ${pct(result.todayShade)} aujourd’hui → ${pct(result.shade)} en 2036`
-      : `${minutes} min à pied · ${length} · ${pct(result.shade)} à l’ombre`;
+      ? `${pct(result.todayShade)} → ${pct(result.shade)} d’ombre`
+      : `${pct(result.shade)} à l’ombre`;
+  details.append(distance, shade);
+  el.resultat.replaceChildren(time, details);
   el.contexte.textContent = routeContext(result.segments);
-  if (speak) el.direct.textContent = el.resultat.textContent;
+  if (speak) el.direct.textContent = `${minutes} minutes à pied, ${length}. ${shade.textContent}.`;
 }
 
 function place(lngLat, which) {
@@ -640,11 +732,11 @@ function syncView() {
   el.explanation.textContent =
     view === "today"
       ? season === "ete"
-        ? "Ombre des bâtiments calculée et couverture des arbres recensés estimée pour le 25 juin 2026. Fontaines et lieux frais observés."
-        : "Ombre des bâtiments calculée pour le 21 décembre. La canopée n’est pas modélisée en hiver. Fontaines et lieux frais recensés en 2026."
+        ? "Rues et arbres actuels · fontaines et lieux frais recensés."
+        : "Soleil d’hiver · ombre des bâtiments seulement."
       : season === "ete"
-        ? "Scénario vers 2036 : les arbres jeunes recensés gagnent 2 m de rayon de canopée. Liserés verts : gain d’ombre estimé ; halos orange : manques ; traits violets : projets de transport. Ce n’est pas une prévision météo."
-        : "Scénario vers 2036 : la croissance de la canopée n’est simulée qu’en été. En hiver, l’ombre reste celle des bâtiments ; les halos montrent les manques et les traits violets les projets de transport.";
+        ? "Arbres jeunes plus grands · eau et refuges inchangés. Scénario, pas prévision."
+        : "L’ombre reste celle des bâtiments en hiver. Scénario, pas prévision.";
   for (const [id, visible] of [
     ["points-eau", el.water.checked],
     ["lieux-frais", el.cool.checked],
@@ -879,7 +971,7 @@ el.corps.innerHTML = `
   <p>Pour l’été, ${treeMeta.treesUsed.toLocaleString("fr-FR")} arbres du jeu « Les arbres » de Paris sont utilisés, dont ${treeMeta.youngTrees.toLocaleString("fr-FR")} classés « Jeune ». Le rayon de houppier actuel est une approximation de 30 % de la hauteur déclarée, limitée entre 1,5 et 6 m. En 2036, seuls ces jeunes arbres gagnent 2 m de rayon, avec un maximum de 8 m. La portion de rue sous les disques est additionnée puis plafonnée à 100 %. Cette couverture n’est pas une mesure de couronne ni une projection physique de l’ombre selon l’azimut du soleil. La météo, l’état sanitaire, l’abattage et la croissance réelle des arbres sont inconnus. En hiver, seule l’ombre des bâtiments est calculée.</p>
   <p>${stats.buildingsUnknownDrawn.toLocaleString("fr-FR")} emprises dans Paris n’ont pas de hauteur. Elles restent un contour en pointillés, sans volume, et ne projettent rien.</p>
   <h3>La couleur</h3>
-  <p>L’axe est découpé en tronçons d’environ ${scene.sampleMeters} m. La couleur combine la part d’ombre calculée pour les bâtiments et la couverture de canopée estimée, de 0 à 100&nbsp;%. De plus loin, ces tronçons sont regroupés en bouts d’environ ${scene.chunkMeters} m. Là où l’axe n’a pas été calculé, il n’y a pas de couleur.</p>
+  <p>L’axe est découpé en tronçons d’environ ${scene.sampleMeters} m. La couleur combine la part d’ombre calculée pour les bâtiments et la couverture de canopée estimée, de 0 à 100&nbsp;%. À l’échelle de Paris, la carte regroupe ces tronçons dans des hexagones de rayon 260 m : chaque couleur est la moyenne des rues calculées de ce secteur, pondérée par le nombre de tronçons. Les secteurs avec moins de huit tronçons connus ne sont pas affichés. En zoomant, les hexagones cèdent la place aux rues, regroupées en bouts d’environ ${scene.chunkMeters} m puis montrées tronçon par tronçon. Un hexagone n’est ni une mesure de température, ni une mesure uniforme de toutes ses surfaces.</p>
   <h3>Les stations de transport</h3>
   <p>Les points de gare ou de station situés dans Paris viennent du jeu « Gares et stations du réseau ferré d’Île-de-France (donnée généralisée) » d’Île-de-France Mobilités. Ce sont des points représentatifs, pas les entrées. Autour de chaque point, la part d’ombre est la moyenne pondérée par longueur des tronçons de rue dont le centre se trouve dans un rayon de 250 m. Les distances à la fontaine disponible et au lieu frais gratuit ou espace vert sont calculées à vol d’oiseau, pas à pied. Les trois points d’attention sont : moins de 40 % d’ombre, plus de 350 m d’une fontaine et plus de 300 m d’un lieu frais. Ces seuils permettent la comparaison ; ils ne constituent pas une norme de santé ou d’accessibilité. Une alerte sur le pictogramme de station signale au moins deux points d’attention. La fiche et la liste textuelle donnent les valeurs précises.</p>
   <h3>Le trajet</h3>

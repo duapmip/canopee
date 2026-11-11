@@ -70,6 +70,8 @@ Une maille « manque » mesure 350 m de côté. Son centre est à plus de 350 m 
 
 Le calcul de l'ombre et du chemin est détaillé dans l'interface, sous **Sources et méthode**. Le code est sous licence MIT. Les données dérivées gardent les obligations de leurs licences sources.
 
+À l'échelle de Paris, la carte affiche une mosaïque d'hexagones de rayon 260 m. Chaque couleur résume la moyenne des tronçons de rue calculés dans ce secteur, pondérée par leur nombre. En zoomant, les rues individuelles apparaissent. Cette vue d'ensemble ne mesure pas la température du secteur.
+
 Les sources ouvertes sont téléchargées lors de la préparation et les fichiers prêts à servir sont inclus dans `public/data/`. Leur date de génération figure dans les JSON concernés. Les données exclusives du hackathon ne sont pas utilisées.
 
 ## Accessibilité
