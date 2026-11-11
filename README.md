@@ -46,7 +46,7 @@ npm ci
 npm run dev
 ```
 
-Ouvrir http://localhost:5173/. Choisir deux adresses pour le trajet, puis basculer entre Aujourd'hui et Vers 2036. « Explorer les stations en texte » donne les données essentielles sans utiliser la carte. Le nombre inscrit sur chaque station représente ses points d'attention, de 0 à 3, en plus de la couleur.
+Ouvrir http://localhost:5173/. Choisir deux adresses pour le trajet, puis basculer entre Aujourd'hui et Vers 2036. Les pictogrammes indiquent les fontaines (eau animée), les lieux frais, les espaces verts (arbre) et les stations. Une alerte sur une station signale au moins deux points d'attention ; sa fiche et « Explorer les stations en texte » donnent les valeurs exactes.
 
 `npm run build` produit le site statique dans `dist/`, données comprises. Le chemin des ressources est relatif pour permettre un hébergement dans un sous-dossier. Pour régénérer les données depuis les sources ouvertes, lancer `npm run prepare-data` avec une connexion réseau et environ 8 Go de mémoire disponibles ; les téléchargements WFS déjà écrits dans `data/raw/` sont repris au prochain lancement.
 
@@ -74,7 +74,7 @@ Les sources ouvertes sont téléchargées lors de la préparation et les fichier
 
 ## Accessibilité
 
-Les formulaires ont des libellés, le trajet et les stations ont des résumés textuels, la liste des stations est utilisable au clavier, et les points d'attention sont indiqués par un nombre en plus de la couleur. Les contrôles ont un focus visible. Cette version n'a pas encore fait l'objet d'un audit RGAA complet.
+Les formulaires ont des libellés, le trajet et les stations ont des résumés textuels, la liste des stations est utilisable au clavier, et les stations à examiner sont distinguées par un symbole d'alerte en plus de la couleur. L'animation de l'eau s'arrête quand la réduction des animations est demandée par le système. Les contrôles ont un focus visible. Cette version n'a pas encore fait l'objet d'un audit RGAA complet.
 
 ## Licence
 

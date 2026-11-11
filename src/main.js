@@ -4,6 +4,7 @@ import "@fontsource/source-sans-3/latin-600.css";
 import "@fontsource/source-sans-3/latin-700.css";
 import * as maplibregl from "maplibre-gl";
 import { pct } from "./annotations.js";
+import { registerMapIcons } from "./map-icons.js";
 import { createRouter, indexBuildings } from "./router.js";
 import "./style.css";
 
@@ -202,6 +203,7 @@ map.on("load", () => {
   map.addSource("manques", { type: "geojson", data: EMPTY });
   map.addSource("projets", { type: "geojson", data: EMPTY });
   map.addSource("stations", { type: "geojson", data: EMPTY });
+  registerMapIcons(map);
 
   const beforeLabels = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
   const add = (layer) => map.addLayer(layer, beforeLabels);
@@ -299,46 +301,37 @@ map.on("load", () => {
     layout: { visibility: "none", "line-cap": "round" },
     paint: { "line-color": "#744a9b", "line-width": 3, "line-dasharray": [2, 2], "line-opacity": 0.85 },
   });
-  for (const [id, category, color] of [
-    ["points-eau", "water", "#0c6478"],
-    ["lieux-frais", "cool", "#145233"],
-    ["parcs-frais", "park", "#78a64b"],
+  for (const [id, category, icon] of [
+    ["points-eau", "water", "picto-fontaine"],
+    ["lieux-frais", "cool", "picto-fraicheur"],
+    ["parcs-frais", "park", "picto-arbre"],
   ]) {
     add({
       id,
-      type: "circle",
+      type: "symbol",
       source: "equipements",
       minzoom: 13,
       filter: ["==", ["get", "category"], category],
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2.5, 14, 5, 17, 8],
-        "circle-color": color,
-        "circle-opacity": 0.88,
-        "circle-stroke-color": "#fffaf2",
-        "circle-stroke-width": 1,
+      layout: {
+        "icon-image": icon,
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.75, 16, 1.1],
+        "icon-allow-overlap": false,
+        "icon-padding": 2,
       },
     });
   }
   add({
     id: "stations-points",
-    type: "circle",
-    source: "stations",
-    minzoom: 12,
-    layout: { visibility: "visible" },
-    paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 8, 16, 11],
-      "circle-color": ["match", ["get", "score"], 3, "#9a3f09", 2, "#b34012", 1, "#35619b", "#234b69"],
-      "circle-stroke-color": "#ffffff",
-      "circle-stroke-width": 1.5,
-    },
-  });
-  add({
-    id: "stations-chiffres",
     type: "symbol",
     source: "stations",
     minzoom: 12,
-    layout: { visibility: "visible", "text-field": ["to-string", ["get", "score"]], "text-size": 11, "text-font": ["Noto Sans Regular"] },
-    paint: { "text-color": "#ffffff" },
+    layout: {
+      visibility: "visible",
+      "icon-image": ["case", [">=", ["get", "score"], 2], "picto-station-alerte", "picto-station"],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 12, 0.8, 16, 1.15],
+      "icon-allow-overlap": false,
+      "icon-padding": 2,
+    },
   });
   map.addLayer({
     id: "trajet-fond",
@@ -657,7 +650,6 @@ function syncView() {
     ["lieux-frais", el.cool.checked],
     ["parcs-frais", el.parks.checked],
     ["stations-points", el.stations.checked],
-    ["stations-chiffres", el.stations.checked],
     ["manques", view === "future"],
     ["projets", view === "future"],
   ]) {
@@ -889,7 +881,7 @@ el.corps.innerHTML = `
   <h3>La couleur</h3>
   <p>L’axe est découpé en tronçons d’environ ${scene.sampleMeters} m. La couleur combine la part d’ombre calculée pour les bâtiments et la couverture de canopée estimée, de 0 à 100&nbsp;%. De plus loin, ces tronçons sont regroupés en bouts d’environ ${scene.chunkMeters} m. Là où l’axe n’a pas été calculé, il n’y a pas de couleur.</p>
   <h3>Les stations de transport</h3>
-  <p>Les points de gare ou de station situés dans Paris viennent du jeu « Gares et stations du réseau ferré d’Île-de-France (donnée généralisée) » d’Île-de-France Mobilités. Ce sont des points représentatifs, pas les entrées. Autour de chaque point, la part d’ombre est la moyenne pondérée par longueur des tronçons de rue dont le centre se trouve dans un rayon de 250 m. Les distances à la fontaine disponible et au lieu frais gratuit ou espace vert sont calculées à vol d’oiseau, pas à pied. Les trois points d’attention sont : moins de 40 % d’ombre, plus de 350 m d’une fontaine et plus de 300 m d’un lieu frais. Ces seuils permettent la comparaison ; ils ne constituent pas une norme de santé ou d’accessibilité. La carte utilise le chiffre 0 à 3 sur chaque station pour être lisible sans dépendre uniquement de la couleur. La liste textuelle donne les mêmes valeurs essentielles.</p>
+  <p>Les points de gare ou de station situés dans Paris viennent du jeu « Gares et stations du réseau ferré d’Île-de-France (donnée généralisée) » d’Île-de-France Mobilités. Ce sont des points représentatifs, pas les entrées. Autour de chaque point, la part d’ombre est la moyenne pondérée par longueur des tronçons de rue dont le centre se trouve dans un rayon de 250 m. Les distances à la fontaine disponible et au lieu frais gratuit ou espace vert sont calculées à vol d’oiseau, pas à pied. Les trois points d’attention sont : moins de 40 % d’ombre, plus de 350 m d’une fontaine et plus de 300 m d’un lieu frais. Ces seuils permettent la comparaison ; ils ne constituent pas une norme de santé ou d’accessibilité. Une alerte sur le pictogramme de station signale au moins deux points d’attention. La fiche et la liste textuelle donnent les valeurs précises.</p>
   <h3>Le trajet</h3>
   <p>A puis B, seulement sur les axes calculés dans le département. Les adresses sont recherchées dans la Base Adresse Nationale via le service de géocodage Géoplateforme. En été, un mètre au soleil du 25 juin coûte trente et une fois un mètre à l’ombre. En hiver, un mètre à l’ombre du 21 décembre coûte trente et une fois un mètre au soleil. Le trait suit les rues. Une fontaine ou un lieu frais gratuit peut être choisi comme étape en cliquant sur la carte. Hors du 75, ou à plus de 60 m d’une rue calculée, rien n’est tracé. Les horaires d’ouverture, l’accessibilité piétonne réelle et la disponibilité d’un équipement doivent être vérifiés sur place.</p>
   <h3>Hauteur du soleil et air</h3>
