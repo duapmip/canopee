@@ -3,6 +3,7 @@ import "@fontsource/source-sans-3/latin-400.css";
 import "@fontsource/source-sans-3/latin-600.css";
 import "@fontsource/source-sans-3/latin-700.css";
 import * as maplibregl from "maplibre-gl";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { pct } from "./annotations.js";
 import { registerMapIcons } from "./map-icons.js";
 import { createRouter, indexBuildings } from "./router.js";
@@ -10,6 +11,7 @@ import "./style.css";
 
 const scene = await fetch("data/scene.json").then((r) => r.json());
 const treeMeta = await fetch("data/tree-cover.json").then((r) => r.json());
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 const params = new URLSearchParams(location.search);
 let hour = Number(params.get("h"));
 if (!scene.hours.includes(hour)) hour = 16;
