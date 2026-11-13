@@ -3,8 +3,9 @@ import "@fontsource/source-sans-3/latin-400.css";
 import "@fontsource/source-sans-3/latin-600.css";
 import "@fontsource/source-sans-3/latin-700.css";
 import * as maplibregl from "maplibre-gl";
-import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
+import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { pct } from "./annotations.js";
+import { BIKE_KMH, createItineraryPlanner, durationParts, WALK_KMH } from "./itinerary.js";
 import { registerMapIcons } from "./map-icons.js";
 import { createLiveShade } from "./live-shade.js";
 import { createRouter, indexBuildings } from "./router.js";
@@ -12,9 +13,10 @@ import { createPlaceVolumes, VOLUME_ZOOM } from "./place-volumes.js";
 import { shadowOffset, sunPosition } from "./sun.js";
 import "./style.css";
 
+maplibregl.setWorkerUrl(mapWorkerUrl);
+
 const scene = await fetch("data/scene.json").then((r) => r.json());
 const treeMeta = await fetch("data/tree-cover.json").then((r) => r.json());
-maplibregl.setWorkerUrl(maplibreWorkerUrl);
 const params = new URLSearchParams(location.search);
 let hour = Number(params.get("h"));
 if (!scene.hours.includes(hour)) hour = 16;
@@ -40,15 +42,20 @@ let weatherToken = 0;
 let pointA = null;
 let pointB = null;
 let selectedStop = null;
+let routeVisible = false;
+let streetColorsMuted = false;
+let nearbyPlaces = null;
 let markerA = null;
 let markerB = null;
 let router = null;
+let planItinerary = null;
 let buildings = null;
 let farKey = "";
 let overviewKey = "";
 const EMPTY = { type: "FeatureCollection", features: [] };
 let amenities = EMPTY;
 let stationCollection = EMPTY;
+let velibCollection = EMPTY;
 let showAllStations = false;
 let armed = null;
 
@@ -56,6 +63,7 @@ const el = {
   nombre: document.getElementById("heure-nombre"),
   unite: document.getElementById("heure-unite"),
   dock: document.querySelector(".heure-dock"),
+  weather: document.getElementById("meteo"),
   range: document.getElementById("heure"),
   direct: document.getElementById("direct"),
   precedent: document.getElementById("precedent"),
@@ -74,7 +82,9 @@ const el = {
   now: document.getElementById("mode-direct"),
   pied: document.getElementById("allure-pied"),
   velo: document.getElementById("allure-velo"),
-  bikeTime: document.getElementById("temps-velo"),
+  velibMode: document.getElementById("allure-velib"),
+  comparison: document.getElementById("trajet-comparaison"),
+  legs: document.getElementById("trajet-etapes"),
   velib: document.getElementById("couche-velib"),
   explanation: document.getElementById("vue-explication"),
   contexte: document.getElementById("trajet-contexte"),
@@ -88,26 +98,45 @@ const el = {
   stationList: document.getElementById("stations-liste"),
   stationAll: document.getElementById("stations-toutes"),
   mapMode: document.getElementById("lecture-mode"),
+  legendInfo: document.getElementById("cle-info"),
+  scale: document.getElementById("degrade"),
   vueDessus: document.getElementById("vue-dessus"),
   vueInclinee: document.getElementById("vue-inclinee"),
+  rotationHint: document.getElementById("aide-rotation"),
 };
+
+if (/macOS|Mac/i.test(navigator.userAgentData?.platform ?? navigator.platform)) {
+  document.getElementById("touche-rotation").textContent = "⌃ Control";
+}
 
 let shadeStops = ["#F4D27A", "#5BA3D9", "#0055A4"];
 let accept = 0;
 let allure = "pied";
-const WALK_M_PER_MIN = 75;
-const BIKE_KMH = 15;
+const OVERVIEW_ZOOM = 12.6;
+const ROUTE_COLOR = getComputedStyle(document.documentElement).getPropertyValue("--trajet").trim();
+const STREET_OPACITY = {
+  "quartiers-ombre": 0.72,
+  "rues-loin": 0.82,
+  "rues-pres": 0.96,
+};
+const PLACE_RADIUS_METERS = 80;
+const PLACE_LAYERS = {
+  equipements: ["points-eau", "lieux-frais", "parcs-frais"],
+  stations: ["stations-points"],
+  velib: ["velib-points"],
+};
 let activePreset = null;
 let paintingShade = false;
 
-function shadeExpression(stops) {
+function shadeExpression(stops, value = ["get", "s"]) {
   if (stops.length >= 3) {
-    return ["interpolate", ["linear"], ["get", "s"], 0, stops[0], 0.5, stops[1], 1, stops[2]];
+    return ["interpolate", ["linear"], value, 0, stops[0], 0.5, stops[1], 1, stops[2]];
   }
-  return ["interpolate", ["linear"], ["get", "s"], 0, stops[0], 1, stops[1]];
+  return ["interpolate", ["linear"], value, 0, stops[0], 1, stops[1]];
 }
 
 function paintLegend(stops) {
+  el.scale.style.setProperty("--degrade-ombre", `linear-gradient(90deg, ${stops.join(", ")})`);
   const cells = [...document.querySelectorAll("#degrade .hex")];
   const last = stops.length - 1;
   cells.forEach((cell, index) => {
@@ -143,17 +172,10 @@ function mixHex(a, b, t) {
   return `#${mixed.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
-function tighten(stops) {
-  const mid = stops.length >= 3 ? stops[1] : mixHex(stops[0], stops[stops.length - 1], 0.5);
-  return stops.map((stop) => mixHex(stop, mid, 0.62));
-}
-
 function refreshGradient() {
-  const overcast = live.on && live.weather === "ok" && live.cover >= 50;
-  const stops = overcast ? tighten(shadeStops) : shadeStops;
-  paintLegend(stops);
+  paintLegend(shadeStops);
   if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) return;
-  paintExpression(stops);
+  paintExpression(shadeStops);
 }
 
 function applyShade(stops, presetId) {
@@ -290,7 +312,6 @@ const map = new maplibregl.Map({
   pitchWithRotate: true,
   touchPitch: true,
   attributionControl: true,
-  customAttribution: "Ombre : IGN BD TOPO et arbres de Paris. Eau et fraîcheur : Ville de Paris, Eau de Paris. Stations et projets : Île-de-France Mobilités. Vélib : Vélib’ Métropole, Open Data Paris, ODbL. 41 °C : Météo-France",
   locale: {
     "NavigationControl.ResetBearing": "Glisser pour tourner, cliquer pour le nord",
     "NavigationControl.ZoomIn": "Zoomer",
@@ -298,8 +319,15 @@ const map = new maplibregl.Map({
   },
 });
 map.touchZoomRotate.enableRotation();
-map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
-map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
+const navigation = new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true });
+const distanceScale = new maplibregl.ScaleControl({ unit: "metric", maxWidth: 100 });
+map.addControl(navigation, "top-right");
+map.addControl(distanceScale, "bottom-right");
+const mapControls = map.getContainer();
+document.getElementById("commandes-carte").append(
+  mapControls.querySelector(".maplibregl-ctrl-group"),
+  mapControls.querySelector(".maplibregl-ctrl-scale"),
+);
 const placeVolumes = createPlaceVolumes(map);
 
 function calmBasemap() {
@@ -481,8 +509,8 @@ function liveCityData() {
 
 function paintLiveStreets() {
   const zoom = map.getZoom();
-  const overview = zoom < 12.6;
-  el.mapMode.textContent = live.up ? "Ombre des rues à cette heure" : "Soleil couché";
+  const overview = zoom < OVERVIEW_ZOOM;
+  if (!live.up) el.mapMode.textContent = "Soleil couché";
   for (const id of ["gain-loin", "gain-pres"]) {
     if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", "none");
   }
@@ -544,19 +572,20 @@ function paintLiveStreets() {
 }
 
 function paintStreets() {
+  const zoom = map.getZoom();
+  const overview = zoom < OVERVIEW_ZOOM;
+  el.scale.classList.toggle("echelle-rues", !overview);
+  el.mapMode.textContent = overview ? "Ombre moyenne des rues par secteur" : "Part d’ombre sur chaque rue";
   if (!router || !map.getSource("rues-loin")) return;
   if (live.on) {
     paintLiveStreets();
     return;
   }
   const index = scene.hours.indexOf(hour);
-  const zoom = map.getZoom();
-  const overview = zoom < 12.6;
   if (map.getLayer("quartiers-ombre")) {
     map.setLayoutProperty("quartiers-ombre", "visibility", overview ? "visible" : "none");
     map.setLayoutProperty("quartiers-filet", "visibility", overview ? "visible" : "none");
   }
-  el.mapMode.textContent = overview ? "Ombre moyenne des rues par secteur" : "Part d’ombre sur chaque rue";
   if (overview) {
     const key = `${season}:${index}:${view}`;
     if (overviewKey !== key) {
@@ -609,25 +638,32 @@ map.on("load", () => {
   map.addSource("batis", { type: "geojson", data: EMPTY });
   map.addSource("ombres", { type: "geojson", data: EMPTY });
   map.addSource("trajet", { type: "geojson", data: EMPTY });
-  map.addSource("equipements", { type: "geojson", data: EMPTY });
+  map.addSource("trajet-continu", { type: "geojson", data: EMPTY });
+  map.addSource("trajet-velib", { type: "geojson", data: EMPTY });
+  map.addSource("equipements", { type: "geojson", data: EMPTY, generateId: true });
   map.addSource("manques", { type: "geojson", data: EMPTY });
   map.addSource("projets", { type: "geojson", data: EMPTY });
-  map.addSource("stations", { type: "geojson", data: EMPTY });
-  map.addSource("velib", { type: "geojson", data: EMPTY });
+  map.addSource("stations", { type: "geojson", data: EMPTY, generateId: true });
+  map.addSource("velib", {
+    type: "geojson",
+    data: EMPTY,
+    generateId: true,
+    attribution: '<a href="https://opendata.paris.fr/explore/dataset/velib-emplacement-des-stations/" target="_blank" rel="noopener">Vélib’ Métropole / Smovengo (ODbL)</a>',
+  });
   registerMapIcons(map);
 
   const beforeLabels = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
   const add = (layer) => map.addLayer(layer, beforeLabels);
   const streetPaint = {
     "line-color": SHADE_COLOR,
-    "line-opacity": 0.82,
+    "line-opacity": STREET_OPACITY["rues-loin"],
     "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.9, 12, 1.55, 14.5, 3.2],
   };
   add({
     id: "quartiers-ombre",
     type: "fill",
     source: "quartiers",
-    paint: { "fill-color": SHADE_COLOR, "fill-opacity": 0.72 },
+    paint: { "fill-color": SHADE_COLOR, "fill-opacity": STREET_OPACITY["quartiers-ombre"] },
   });
   add({
     id: "quartiers-filet",
@@ -665,7 +701,7 @@ map.on("load", () => {
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
       "line-color": SHADE_COLOR,
-      "line-opacity": 0.96,
+      "line-opacity": STREET_OPACITY["rues-pres"],
       "line-width": ["interpolate", ["linear"], ["zoom"], 15, 2.6, 17, 4.4, 18.5, 6.5],
     },
   });
@@ -774,30 +810,46 @@ map.on("load", () => {
       "icon-padding": 2,
     },
   });
+  map.addLayer(placeVolumes.layer);
   map.addLayer({
     id: "trajet-fond",
     type: "line",
-    source: "trajet",
+    source: "trajet-continu",
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": "#fffaf2", "line-width": 12, "line-opacity": 1 },
+    paint: { "line-color": "#ffffff", "line-width": ["case", ["==", ["get", "mode"], "velo"], 13, 11] },
   });
-  map.addLayer(placeVolumes.layer);
+  map.addLayer({
+    id: "trajet-contour",
+    type: "line",
+    source: "trajet-continu",
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": ROUTE_COLOR, "line-width": ["case", ["==", ["get", "mode"], "velo"], 9, 7] },
+  });
   map.addLayer({
     id: "trajet-couleur",
     type: "line",
     source: "trajet",
+    minzoom: OVERVIEW_ZOOM,
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
-      "line-width": 6,
-      "line-color": getComputedStyle(document.documentElement).getPropertyValue("--trajet").trim() || "#7a2be2",
+      "line-width": ["case", ["==", ["get", "mode"], "velo"], 5, 3.5],
+      "line-color": ["case", ["<", ["get", "s"], 0], ROUTE_COLOR, SHADE_COLOR],
     },
   });
+  map.addLayer({
+    id: "trajet-stations-velib",
+    type: "symbol",
+    source: "trajet-velib",
+    layout: { "icon-image": "picto-velo", "icon-size": 1.1, "icon-allow-overlap": true },
+  });
 
+  map.on("zoom", () => el.scale.classList.toggle("echelle-rues", map.getZoom() >= OVERVIEW_ZOOM));
   map.on("pitch", () => {
     syncVolumes();
     placeVolumes.sync();
     syncPlaceIcons();
     syncAim();
+    syncRouteContrast();
     if (map.getPitch() > 2 && batisKey !== "ville" && map.getZoom() < 14.8) paintBuildings();
   });
   map.on("pitchend", () => { paintStreets(); placeVolumes.sync(); syncPlaceIcons(); });
@@ -835,10 +887,12 @@ map.on("load", () => {
   ])
     .then(([axes, treeCover, batis, places, gaps, projects, stationRows, velib, parkShapes]) => {
       router = createRouter(axes, (lon, lat) => pointInRing(lon, lat, scene.ring), treeCover);
+      planItinerary = createItineraryPlanner(router, velib.features);
       buildings = indexBuildings(batis);
       liveShade = createLiveShade(buildings);
       amenities = places;
       stationCollection = stationRows;
+      velibCollection = velib;
       placeVolumes.setData(places, stationRows, velib);
       placeVolumes.setShapes(parkShapes);
       map.getSource("equipements").setData(places);
@@ -889,8 +943,29 @@ function hideBorne(letter) {
   (letter === "A" ? markerA : markerB)?.remove();
 }
 
+function syncRouteContrast() {
+  const muted = routeVisible && map.getPitch() <= 2;
+  if (muted === streetColorsMuted) return;
+  streetColorsMuted = muted;
+  for (const [layer, opacity] of Object.entries(STREET_OPACITY)) {
+    const property = layer === "quartiers-ombre" ? "fill-opacity" : "line-opacity";
+    map.setPaintProperty(layer, property, muted ? opacity * 0.35 : opacity);
+  }
+  const iconOpacity = muted
+    ? ["case", ["boolean", ["feature-state", "nearRoute"], false], 1, 0.25]
+    : 1;
+  for (const layers of Object.values(PLACE_LAYERS)) {
+    for (const layer of layers) map.setPaintProperty(layer, "icon-opacity", iconOpacity);
+  }
+}
+
 function clearLine() {
   map.getSource("trajet")?.setData(EMPTY);
+  map.getSource("trajet-continu")?.setData(EMPTY);
+  map.getSource("trajet-velib")?.setData(EMPTY);
+  routeVisible = false;
+  syncRouteContrast();
+  updateNearbyPlaces([]);
 }
 
 const ICON_EAU = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="#0878ad"/><rect x="4.2" y="5.4" width="7.2" height="1.8" rx="0.6" fill="#fff"/><path d="M5.6 11.2h6.6l-.9 2.2H6.5z" fill="#fff"/></svg>`;
@@ -899,7 +974,7 @@ const ICON_PARC = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy
 const ICON_SOLEIL = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.4" fill="#da6840"/><g fill="none" stroke="#da6840" stroke-width="1.7" stroke-linecap="round"><path d="M12 3.2v2.3M12 18.5V20.8M3.2 12h2.3M18.5 12h2.3M5.8 5.8l1.6 1.6M16.6 16.6l1.6 1.6M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6"/></g></svg>`;
 const ICON_OMBRE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.2c2.4 1.5 4.4 1.2 6.6-.2 2.2-1.4 4.2-1.6 6.6-.1 2.2 1.3 4.1 1.5 6.3.2" fill="none" stroke="#176778" stroke-width="1.6" stroke-linecap="round"/><path d="M7.2 16.2V8.2h3.4v8M10.6 16.2V5.6H16.4v10.6" fill="#176778"/></svg>`;
 const ICON_TEMPS = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6.2" fill="none" stroke="#0071e3" stroke-width="1.6"/><path d="M9 5.6V9l2.4 1.6" fill="none" stroke="#0071e3" stroke-width="1.6" stroke-linecap="round"/></svg>`;
-const ICON_MARCHE = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="6" cy="4.2" r="1.3" fill="#258251"/><path d="M7.2 7.2 5.4 9.6l1.8 1.2-1.2 3.6M8.2 7.4l2.2 1.8 1.6-.4M10.4 9.2l1.4 4.8" fill="none" stroke="#258251" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_DISTANCE = `<svg viewBox="0 0 18 18" aria-hidden="true"><g transform="rotate(-38 9 9)" fill="none" stroke="#36556f" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="2.3" y="6" width="13.4" height="6" rx="1.2"/><path d="M5.3 6v2.3M9 6v1.5M12.7 6v2.3"/></g></svg>`;
 
 function iconNode(markup) {
   const holder = document.createElement("span");
@@ -907,16 +982,22 @@ function iconNode(markup) {
   return holder.firstElementChild;
 }
 
-function statCard(markup, value, unit, featured) {
+function statCard(markup, parts, featured = false) {
   const card = document.createElement("div");
   card.className = featured ? "stat stat-temps" : "stat";
-  const strong = document.createElement("strong");
-  strong.textContent = value;
-  const label = document.createElement("span");
-  label.textContent = unit;
   const row = document.createElement("span");
   row.className = "stat-chiffre";
-  row.append(strong, label);
+  for (const [value, unit] of parts) {
+    const number = document.createElement("strong");
+    number.textContent = value;
+    const label = document.createElement("span");
+    label.textContent = unit ? ` ${unit}` : "";
+    const pair = document.createElement("span");
+    pair.className = "stat-unite";
+    pair.append(number, label);
+    if (row.childElementCount) row.append(" ");
+    row.append(pair);
+  }
   card.append(iconNode(markup), row);
   return card;
 }
@@ -924,32 +1005,61 @@ function statCard(markup, value, unit, featured) {
 function note(text) {
   el.resultat.className = "trajet-resultat";
   el.resultat.textContent = text;
-  el.bikeTime.hidden = true;
+  el.comparison.hidden = true;
+  el.legs.hidden = true;
 }
 
-function routeMeetings(segments) {
-  const points = amenities.features || [];
-  let water = 0;
-  let cool = 0;
-  let parks = 0;
-  for (const feature of points) {
-    const category = feature.properties.category;
-    if (category !== "water" && category !== "cool" && category !== "park") continue;
-    const [lon, lat] = feature.geometry.coordinates;
-    const near = segments.some((segment) => {
-      const [a, b] = segment.coords;
-      const x = (lon - a[0]) * 73400;
-      const y = (lat - a[1]) * 111132;
-      const dx = (b[0] - a[0]) * 73400;
-      const dy = (b[1] - a[1]) * 111132;
-      const t = Math.max(0, Math.min(1, (x * dx + y * dy) / (dx * dx + dy * dy || 1)));
-      return Math.hypot(x - t * dx, y - t * dy) <= 80;
+function updateNearbyPlaces(segments) {
+  if (!segments.length && !nearbyPlaces) return;
+  const radius = PLACE_RADIUS_METERS;
+  const project = ([lon, lat]) => [lon * 73400, lat * 111132];
+  const edges = segments.map(({ coords: [a, b] }) => {
+    const [x, y] = project(a);
+    const [bx, by] = project(b);
+    const dx = bx - x;
+    const dy = by - y;
+    return { x, y, dx, dy, length2: dx ** 2 + dy ** 2 || 1 };
+  });
+  const closeToRoute = (coordinates) => {
+    const [px, py] = project(coordinates);
+    return edges.some(({ x, y, dx, dy, length2 }) => {
+      const tx = px - x;
+      const ty = py - y;
+      if (tx < Math.min(0, dx) - radius || tx > Math.max(0, dx) + radius ||
+          ty < Math.min(0, dy) - radius || ty > Math.max(0, dy) + radius) return false;
+      const t = Math.max(0, Math.min(1, (tx * dx + ty * dy) / length2));
+      return (tx - t * dx) ** 2 + (ty - t * dy) ** 2 <= radius ** 2;
     });
-    if (!near) continue;
-    if (category === "water") water++;
-    else if (category === "park") parks++;
-    else cool++;
+  };
+  const nearby = {};
+  for (const [source, collection] of Object.entries({
+    equipements: amenities,
+    stations: stationCollection,
+    velib: velibCollection,
+  })) {
+    const previous = nearbyPlaces?.[source] ?? new Set();
+    const next = new Set();
+    if (edges.length) collection.features.forEach((feature, id) => {
+      if (closeToRoute(feature.geometry.coordinates)) next.add(id);
+    });
+    for (const id of previous) {
+      if (!next.has(id)) map.removeFeatureState({ source, id }, "nearRoute");
+    }
+    for (const id of next) {
+      if (!previous.has(id)) map.setFeatureState({ source, id }, { nearRoute: true });
+    }
+    nearby[source] = next;
   }
+  nearbyPlaces = edges.length ? nearby : null;
+}
+
+function routeMeetings() {
+  const counts = { water: 0, cool: 0, park: 0 };
+  for (const id of nearbyPlaces?.equipements ?? []) {
+    const category = amenities.features[id].properties.category;
+    if (category in counts) counts[category]++;
+  }
+  const { water, cool, park: parks } = counts;
   el.contexte.replaceChildren();
   if (!water && !cool && !parks) {
     el.contexte.removeAttribute("aria-label");
@@ -1070,83 +1180,99 @@ function renderStations() {
 el.stationSearch.addEventListener("input", () => renderStationList(stationCollection.features.map(stationProfile)));
 el.stationAll.addEventListener("click", () => { showAllStations = true; renderStationList(stationCollection.features.map(stationProfile)); });
 
-function routePlan(lonA, latA, lonB, latB) {
+function routePlan(origin, destination, preference) {
   const hourIndex = scene.hours.indexOf(hour);
-  if (live.on && liveShade) {
-    return router.plan(lonA, latA, lonB, latB, season, hourIndex, false, {
-      up: live.up,
-      fraction: liveFraction,
-    }, accept);
+  const solar = live.on && liveShade ? { up: live.up, fraction: liveFraction } : null;
+  return router.plan(...origin, ...destination, season, hourIndex, !solar && view === "future", solar, preference);
+}
+
+function renderLegs(result) {
+  el.legs.replaceChildren();
+  el.legs.hidden = !result.pickup;
+  if (!result.pickup) return;
+  const pickup = result.pickup.properties.name;
+  const dropoff = result.dropoff.properties.name;
+  const labels = [`À pied vers ${pickup}`, `En Vélib jusqu’à ${dropoff}`, "À pied jusqu’à l’arrivée"];
+  for (const label of labels) {
+    const row = document.createElement("li");
+    row.textContent = label;
+    el.legs.append(row);
   }
-  return router.plan(lonA, latA, lonB, latB, season, hourIndex, view === "future", null, accept);
 }
 
 function drawRoute(speak) {
-  if (!pointA || !pointB || !router || !map.getSource("trajet")) return;
-  let result = routePlan(pointA[0], pointA[1], pointB[0], pointB[1]);
-  if (result.ok && selectedStop) {
-    const [lon, lat] = selectedStop.geometry.coordinates;
-    const first = routePlan(pointA[0], pointA[1], lon, lat);
-    const second = routePlan(lon, lat, pointB[0], pointB[1]);
-    if (first.ok && second.ok) {
-      const length = first.length + second.length;
-      result = {
-        ...result,
-        segments: [...first.segments, ...second.segments],
-        length,
-        shade: length ? (first.shade * first.length + second.shade * second.length) / length : null,
-        todayShade: length ? (first.todayShade * first.length + second.todayShade * second.length) / length : null,
-      };
-    } else {
-      selectedStop = null;
-    }
-  }
+  if (!pointA || !pointB || !planItinerary || !map.getSource("trajet")) return;
+  const request = {
+    origin: pointA,
+    destination: pointB,
+    mode: allure,
+    plan: routePlan,
+    stop: selectedStop?.geometry.coordinates,
+  };
+  const result = planItinerary({ ...request, preference: accept });
+  showBorne("A", pointA);
+  showBorne("B", pointB);
   if (!result.ok) {
     clearLine();
-    hideBorne("B");
-    pointB = null;
     note(result.message);
     el.contexte.replaceChildren();
-    if (speak) el.direct.textContent = result.message;
+    el.direct.textContent = result.message;
     return;
   }
-  showBorne("A", result.origin);
-  showBorne("B", result.destination);
   map.getSource("trajet").setData({
     type: "FeatureCollection",
-    features: result.segments
-      .filter((segment) => segment.coords.length >= 2)
-      .map((segment) => ({
-        type: "Feature",
-        properties: { s: segment.s },
-        geometry: { type: "LineString", coordinates: segment.coords },
-      })),
+    features: result.segments.map((segment) => ({
+      type: "Feature",
+      properties: { s: segment.s, mode: segment.mode },
+      geometry: { type: "LineString", coordinates: segment.coords },
+    })),
   });
-  const meters = Math.round(result.length);
-  const minutes = Math.max(1, Math.round(result.length / WALK_M_PER_MIN));
-  const wantSun = accept > 50;
-  const sunShare = result.neutral || result.shade == null ? null : wantSun ? 1 - result.shade : result.shade;
+  map.getSource("trajet-continu").setData({
+    type: "FeatureCollection",
+    features: result.legs.filter((leg) => leg.segments.length).map(({ segments }) => {
+      const coordinates = [segments[0].coords[0]];
+      for (const { coords: [start, end] } of segments) {
+        const last = coordinates.at(-1);
+        if (last[0] !== start[0] || last[1] !== start[1]) coordinates.push(start);
+        coordinates.push(end);
+      }
+      return {
+        type: "Feature",
+        properties: { mode: segments[0].mode },
+        geometry: { type: "LineString", coordinates },
+      };
+    }),
+  });
+  map.getSource("trajet-velib").setData({
+    type: "FeatureCollection",
+    features: result.pickup ? [result.pickup, result.dropoff] : [],
+  });
+  routeVisible = result.segments.length > 0;
+  updateNearbyPlaces(result.segments);
+  syncRouteContrast();
+  const duration = durationParts(result.minutes);
+  const sunShare = result.sun;
   const shareLabel = sunShare == null
-    ? (result.neutral ? "Soleil couché" : "Part d’ombre inconnue")
-    : wantSun
-      ? `${pct(sunShare)} au soleil`
-      : `${pct(sunShare)} à l’ombre`;
+    ? (result.neutral ? "Soleil couché" : "Part de soleil inconnue")
+    : `${pct(sunShare)} au soleil`;
   el.resultat.className = "trajet-cartes";
   el.resultat.replaceChildren(
-    statCard(ICON_TEMPS, String(minutes), "min", true),
-    statCard(ICON_MARCHE, meters.toLocaleString("fr-FR"), "m"),
-    statCard(wantSun ? ICON_SOLEIL : ICON_OMBRE, sunShare == null ? "—" : String(Math.round(sunShare * 100)), sunShare == null ? "" : "%"),
+    statCard(ICON_TEMPS, duration, true),
+    statCard(ICON_DISTANCE, [[Math.round(result.length).toLocaleString("fr-FR"), "m"]]),
+    statCard(ICON_SOLEIL, [[sunShare == null ? "—" : String(Math.round(sunShare * 100)), sunShare == null ? "" : "% soleil"]]),
   );
-  if (allure === "velo") {
-    const bikeMinutes = Math.max(1, Math.round(result.length / (BIKE_KMH * 1000 / 60)));
-    el.bikeTime.hidden = false;
-    el.bikeTime.textContent = `${bikeMinutes} min à vélo, ${BIKE_KMH} km/h`;
-  } else {
-    el.bikeTime.hidden = true;
-    el.bikeTime.textContent = "";
+  const normal = accept === 50 ? result : planItinerary({ ...request, preference: 50 });
+  el.comparison.hidden = !normal.ok;
+  if (normal.ok) {
+    const normalTime = durationParts(normal.minutes).map((part) => part.join(" ")).join(" ");
+    const comparisonSun = normal.sun == null ? "" : ` et ${pct(normal.sun)} au soleil`;
+    el.comparison.textContent = accept === 50 ? "Trajet de référence" : `Normal : ${normalTime}${comparisonSun}`;
   }
-  const meetings = routeMeetings(result.segments);
-  el.direct.textContent = `${minutes} minutes, ${formatLength(result.length)}. ${shareLabel}. ${meetings}`.trim();
+  renderLegs(result);
+  const meetings = routeMeetings();
+  const time = duration.map((part) => part.join(" ")).join(" ");
+  const announcement = `${time}, ${formatLength(result.length)}. ${shareLabel}. ${meetings}`.trim();
+  if (speak || el.direct.textContent !== announcement) el.direct.textContent = announcement;
 }
 
 const streetToken = { a: 0, b: 0 };
@@ -1220,10 +1346,12 @@ function syncAim() {
   const tilted = map.getPitch() > 2;
   el.vueDessus.setAttribute("aria-pressed", String(!tilted));
   el.vueInclinee.setAttribute("aria-pressed", String(tilted));
+  el.rotationHint.hidden = !tilted;
 }
 
 function aimView(tilted) {
-  map.easeTo({ pitch: tilted ? 60 : 0, bearing: 0, duration: 650 });
+  const zoom = map.getZoom();
+  map.easeTo({ pitch: tilted ? 60 : 0, zoom: tilted ? Math.max(zoom, VOLUME_ZOOM) : zoom, bearing: 0, duration: 650 });
 }
 
 function syncPlaceIcons() {
@@ -1234,6 +1362,7 @@ function syncPlaceIcons() {
     ["parcs-frais", el.parks.checked && !volumesOn],
     ["stations-points", el.stations.checked && !volumesOn],
     ["velib-points", el.velib.checked && !volumesOn],
+    ["trajet-stations-velib", !volumesOn || !el.velib.checked],
   ]) {
     if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
   }
@@ -1302,10 +1431,12 @@ function currentSun() {
 }
 
 function sunSentence() {
+  if (accept === 33) return "Un détour seulement s’il vaut le temps.";
+  if (accept === 50) return "Le trajet le plus court sert de référence.";
   if (live.on && !live.up) return "Soleil couché.";
   if (accept <= 0) return "Le trajet évite le soleil.";
   if (accept >= 100) return "Le trajet cherche le soleil.";
-  return "Un détour seulement s’il vaut le temps.";
+  return "Le trajet privilégie les rues au soleil.";
 }
 
 function renderCopy() {
@@ -1314,20 +1445,17 @@ function renderCopy() {
   const seek = accept > 50;
   el.goalIcon.replaceChildren(iconNode((live.on && !live.up) || seek ? ICON_SOLEIL : ICON_OMBRE));
   el.goalText.textContent = sunSentence();
-  el.goalExtra.classList.toggle("ligne-meteo", live.on);
   if (live.on) {
+    el.goalExtra.textContent = "";
     if (live.weather === "ok") {
-      const sky = live.cover >= 50 ? "couvert" : "dégagé";
-      const line = `${live.label}, ${formatTemp(live.temp)}, ${sky}`;
-      el.goalExtra.textContent = live.cover >= 50
-        ? `${line}. Le ciel couvert compte plus que l’ombre des murs.`
-        : line;
-    } else if (live.weather === "miss") {
-      el.goalExtra.textContent = `${live.label}. La météo manque.`;
+      const sky = live.cover >= 50 ? "Couvert" : "Dégagé";
+      el.weather.textContent = `${formatTemp(live.temp)}, ${sky}`;
     } else {
-      el.goalExtra.textContent = live.label;
+      el.weather.textContent = live.weather === "miss" ? "Météo indisponible" : "Météo en cours de chargement";
     }
   } else {
+    const temp = view === "today" && season === "ete" ? scene.temperature.byHour[hour] : null;
+    el.weather.textContent = Number.isFinite(temp) ? `${formatTemp(temp)}, ciel dégagé (modèle)` : "Ciel dégagé (modèle)";
     el.goalExtra.textContent = view === "today"
       ? ""
       : season === "hiver"
@@ -1389,6 +1517,7 @@ function tickLive() {
   currentSun();
   renderCopy();
   paintStreets();
+  if (pointA && pointB) drawRoute(false);
   loadWeather();
 }
 
@@ -1417,10 +1546,8 @@ async function loadWeather() {
       live.weather = "miss";
     }
   }
-  const previous = live.mode;
   currentSun();
   renderCopy();
-  if ((live.mode !== previous) && pointA && pointB) drawRoute(false);
 }
 
 function syncView() {
@@ -1519,18 +1646,9 @@ function showStationPopup(feature, lngLat, suppliedProfile) {
 
 function popup(feature, lngLat) {
   if (feature.properties?.category === "velib") {
-    const places = Number.isFinite(Number(feature.properties.capacity))
-      ? `${feature.properties.capacity} emplacements`
-      : "";
-    openFiche(lngLat, feature.properties.name, "Vélib", places, allure === "velo" && pointA && pointB
-      ? {
-          label: "Étape",
-          run() {
-            selectedStop = feature;
-            drawRoute(true);
-          },
-        }
-      : null);
+    const capacity = feature.properties.capacity;
+    const places = Number.isFinite(capacity) ? `${capacity} emplacements` : "";
+    openFiche(lngLat, feature.properties.name, "Vélib", places);
     return;
   }
   if (feature.properties.category === "station") {
@@ -1573,7 +1691,7 @@ function popup(feature, lngLat) {
 }
 
 function onMapClick(event) {
-  const ids = ["velib-points", "stations-points", "points-eau", "lieux-frais", "parcs-frais", "manques", "projets"].filter((id) => map.getLayer(id));
+  const ids = ["trajet-stations-velib", "velib-points", "stations-points", "points-eau", "lieux-frais", "parcs-frais", "manques", "projets"].filter((id) => map.getLayer(id));
   const feature = map.queryRenderedFeatures(event.point, { layers: ids })[0];
   if (feature) {
     popup(feature, event.lngLat);
@@ -1644,6 +1762,10 @@ for (const letter of ["a", "b"]) {
 }
 el.vueDessus.addEventListener("click", () => aimView(false));
 el.vueInclinee.addEventListener("click", () => aimView(true));
+el.legendInfo.addEventListener("click", () => {
+  el.mapMode.hidden = !el.mapMode.hidden;
+  el.legendInfo.setAttribute("aria-expanded", String(!el.mapMode.hidden));
+});
 el.today.addEventListener("click", () => { leaveLive(); view = "today"; syncView(); });
 el.future.addEventListener("click", () => { leaveLive(); view = "future"; syncView(); });
 el.now.addEventListener("click", () => enterLive());
@@ -1652,16 +1774,13 @@ function setAllure(next) {
   allure = next;
   el.pied.setAttribute("aria-pressed", String(next === "pied"));
   el.velo.setAttribute("aria-pressed", String(next === "velo"));
-  if (next === "pied" && selectedStop?.properties?.category === "velib") selectedStop = null;
+  el.velibMode.setAttribute("aria-pressed", String(next === "velib"));
   if (pointA && pointB) drawRoute(false);
-  else {
-    el.bikeTime.hidden = true;
-    el.bikeTime.textContent = "";
-  }
 }
 
 el.pied.addEventListener("click", () => setAllure("pied"));
 el.velo.addEventListener("click", () => setAllure("velo"));
+el.velibMode.addEventListener("click", () => setAllure("velib"));
 for (const button of document.querySelectorAll("#soleil-crans button")) {
   button.addEventListener("click", () => {
     accept = Number(button.dataset.accept);
@@ -1680,18 +1799,20 @@ function setSeason(next) {
   syncView();
 }
 
-// Restore a concrete example or station selected on the separate data story.
 function openStorySelection() {
   if (params.get("season") === "hiver") setSeason("hiver");
   const parsePoint = (key) => {
     const parts = params.get(key)?.split(",");
-    if (!parts || parts.length !== 2 || parts.some((p) => !p.trim())) return null;
-    const p = parts.map(Number);
-    return p.every(Number.isFinite) && pointInRing(p[0], p[1], scene.ring) ? p : null;
+    if (parts?.length !== 2 || parts.some((part) => !part.trim())) return null;
+    const point = parts.map(Number);
+    return point.every(Number.isFinite) && router.snap(...point).ok ? point : null;
   };
-  const a = parsePoint("a"), b = parsePoint("b");
+  const a = parsePoint("a");
+  const b = parsePoint("b");
   if (a && b) {
-    accept = params.get("accept") === "100" || (!params.has("accept") && season === "hiver") ? 100 : 0;
+    const requested = params.get("accept");
+    if (["0", "33", "50", "67", "100"].includes(requested)) accept = Number(requested);
+    else if (season === "hiver") accept = 100;
     for (const button of document.querySelectorAll("#soleil-crans button")) {
       button.setAttribute("aria-pressed", String(Number(button.dataset.accept) === accept));
     }
@@ -1701,18 +1822,20 @@ function openStorySelection() {
     document.getElementById("adresse-a").value = "Départ de l’exemple";
     document.getElementById("adresse-b").value = "Station de l’exemple";
     const bounds = new maplibregl.LngLatBounds(a, a).extend(b);
-    const route = routePlan(...a, ...b);
-    if (route.ok) for (const segment of route.segments) for (const point of segment.coords) bounds.extend(point);
+    const route = routePlan(a, b, accept);
+    if (route.ok) {
+      for (const { coords } of route.segments) for (const point of coords) bounds.extend(point);
+    }
     map.fitBounds(bounds, { padding: padding(), maxZoom: 16, duration: 0 });
     return;
   }
-  const station = stationCollection.features.find((f) => f.properties.id === params.get("station"));
+  const station = stationCollection.features.find((feature) => feature.properties.id === params.get("station"));
   if (station) {
-    map.jumpTo({ center: station.geometry.coordinates, zoom: 15.4, padding: padding() });
-    showStationPopup(station, station.geometry.coordinates, stationProfile(station));
+    const center = station.geometry.coordinates;
+    map.jumpTo({ center, zoom: 15.4, padding: padding() });
+    showStationPopup(station, center, stationProfile(station));
   }
 }
-
 
 el.ete.addEventListener("click", () => setSeason("ete"));
 el.hiver.addEventListener("click", () => setSeason("hiver"));
@@ -1791,7 +1914,9 @@ el.corps.innerHTML = `
   <h3>Les stations de transport</h3>
   <p>Les points de gare ou de station situés dans Paris viennent du jeu « Gares et stations du réseau ferré d’Île-de-France (donnée généralisée) » d’Île-de-France Mobilités. Ce sont des points représentatifs, pas les entrées. Autour de chaque point, la part d’ombre est la moyenne pondérée par longueur des tronçons de rue dont le centre se trouve dans un rayon de 250 m. Les distances à la fontaine disponible et au lieu frais gratuit ou espace vert sont calculées à vol d’oiseau, pas à pied. Les trois points d’attention sont : moins de 40 % d’ombre, plus de 350 m d’une fontaine et plus de 300 m d’un lieu frais. Ces seuils permettent la comparaison ; ils ne constituent pas une norme de santé ou d’accessibilité. Une alerte sur le pictogramme de station signale au moins deux points d’attention. La fiche et la liste textuelle donnent les valeurs précises.</p>
   <h3>Le trajet</h3>
-  <p>A puis B, seulement sur les axes calculés dans le département. Les adresses sont recherchées dans la Base Adresse Nationale via le service de géocodage Géoplateforme. En été, un mètre au soleil du 25 juin coûte trente et une fois un mètre à l’ombre. En hiver, un mètre à l’ombre du 21 décembre coûte trente et une fois un mètre au soleil. Le trait suit les rues. Une fontaine ou un lieu frais gratuit peut être choisi comme étape en cliquant sur la carte. Hors du 75, ou à plus de 60 m d’une rue calculée, rien n’est tracé. Les horaires d’ouverture, l’accessibilité piétonne réelle et la disponibilité d’un équipement doivent être vérifiés sur place.</p>
+  <p>Le tracé suit les axes BD TOPO calculés dans Paris. Le cran Normal minimise la distance sur ce réseau et sert de référence. Les autres crans pondèrent les tronçons selon leur part d’ombre calculée. Le pourcentage de soleil est pondéré par la distance sur les tronçons dont l’exposition est connue. Les adresses proviennent de la Base Adresse Nationale.</p>
+  <p>À pied et à vélo personnel, le trajet relie le départ à l’arrivée. La durée est estimée à ${WALK_KMH} km/h à pied et ${BIKE_KMH} km/h à vélo. Le réseau utilisé est commun aux deux modes, avec des sens de circulation et des accès cyclables à vérifier.</p>
+  <p>En Vélib, les stations de prise et de dépôt sont les plus proches à vol d’oiseau de chaque extrémité parmi les stations reliées au trajet. Les deux portions à pied prennent le chemin le plus court. Le cran de soleil s’applique au trajet entre les stations. La durée additionne les trois portions, hors temps de prise et de dépôt. Les bornettes et les vélos disponibles sont à vérifier auprès de Vélib’ Métropole.</p>
   <h3>Hauteur du soleil et air</h3>
   <table>
     <caption>Station ${scene.temperature.station} (${scene.temperature.id}), le 25 juin 2026. La couleur de la carte n’utilise pas ces températures.</caption>
@@ -1805,9 +1930,10 @@ el.corps.innerHTML = `
     <li>Ville de Paris : Les arbres, hauteurs, stades de développement et emplacements. ODbL. Relevé lors de la génération du prototype.</li>
     <li>Île-de-France Mobilités : Lignes de transport en projet en Île-de-France. Dates estimées et statuts fournis par le jeu. Licence Ouverte.</li>
     <li>Île-de-France Mobilités : Gares et stations du réseau ferré d’Île-de-France (donnée généralisée). Points représentatifs, licence Ouverte v2.</li>
-    <li>Vélib’ Métropole, via Open Data Paris : emplacement des stations. Nom, code et nombre d’emplacements. ODbL. Pas de disponibilité en temps réel.</li>
+    <li>Smovengo / Syndicat Autolib’ Vélib’ Métropole, via <a href="https://opendata.paris.fr/explore/dataset/velib-emplacement-des-stations/">Open Data Paris</a>. Stations situées dans le contour de Paris utilisé par Canopée. <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>. <a href="./data/velib.json" download>Télécharger le GeoJSON</a>.</li>
     <li>Base Adresse Nationale / IGN : service de géocodage Géoplateforme.</li>
     <li>${scene.temperature.source} À Luxembourg, ${scene.temperature.byHour[16] ?? "—"} °C à 16 h. À Montsouris, ${scene.montsouris.byHour[16] ?? "—"} °C à la même heure.</li>
+    <li>Météo en mode Direct : <a href="https://open-meteo.com/en/license">Open-Meteo, CC BY 4.0</a>. Température de l’air et couverture nuageuse.</li>
     <li>Fond : OpenFreeMap, données OpenStreetMap. ODbL.</li>
   </ul>
 `;

@@ -694,6 +694,6 @@ init().catch((error) => {
   const el = $("load-status");
   el.hidden = false;
   el.innerHTML =
-    'Les graphiques n’ont pas pu être chargés. <a href="./recit.html">Réessayer</a> ou <a href="./index.html">ouvrir la carte</a>.';
+    'Les graphiques n’ont pas pu être chargés. <a href="./dataviz">Réessayer</a> ou <a href="./index.html">ouvrir la carte</a>.';
   el.setAttribute("role", "alert");
 });

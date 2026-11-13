@@ -49,7 +49,7 @@ export function createToolPreview(data, motion) {
             {id:'shadows',type:'fill',source:'shadows',paint:{'fill-color':'#2a313c','fill-opacity':.32}},
             {id:'building-volumes',type:'fill-extrusion',source:'buildings',paint:{'fill-extrusion-color':'#e4d5c0','fill-extrusion-height':['get','h'],'fill-extrusion-opacity':1,'fill-extrusion-base':0}},
             {id:'route-halo',type:'line',source:'route',paint:{'line-color':'#fffaf2','line-width':11},layout:{'line-cap':'round','line-join':'round'}},
-            {id:'route',type:'line',source:'route',paint:{'line-color':'#7a2be2','line-width':5},layout:{'line-cap':'round','line-join':'round'}},
+            {id:'route',type:'line',source:'route',paint:{'line-color':'#142b44','line-width':5},layout:{'line-cap':'round','line-join':'round'}},
           ],
         },
       });

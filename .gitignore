@@ -5,3 +5,4 @@ data/raw
 .env.*
 .DS_Store
 npm-debug.log*
+.vercel

@@ -1,14 +1,12 @@
-# Canopée — adapter les mobilités du quotidien à la chaleur
+# Canopée — rejoindre les transports à l’ombre pendant une canicule
 
-Datavisualisation interactive pour le défi « mobilités et adaptation climatique » du Hackaviz Mobilités 2026, organisé par Île-de-France Mobilités. Paris est notre terrain pilote. La carte aide à lire l'ombre des rues, à repérer les stations de transport, l'eau et les lieux frais, puis à préparer un trajet à pied ou à vélo entre deux adresses.
+Datavisualisation interactive pour le défi « mobilités et adaptation climatique » du Hackaviz Mobilités 2026, organisé par Île-de-France Mobilités. Paris est notre terrain pilote. La carte aide à lire l'ombre des rues, à repérer les stations de transport, l'eau et les lieux frais, puis à préparer un trajet à pied entre deux adresses.
 
 ## Présentation du projet
 
-La carte reprend l’interface de duapmip sur `main`, commit [`c17a504`](https://github.com/duapmip/canopee/commit/c17a504d7bab5cc8d97765ffde331f889df5d344) du 13 novembre 2026 : mode Direct, préférences d’exposition et données Vélib, en plus des panneaux translucides, de la vue 3D et des volumes des parcs. L’intégration locale conserve les liens avec le récit, les deux pages dans le build et le chargement explicite du worker MapLibre nécessaire après compilation.
+### Dataviz · Mobilités douces, ville plus chaude
 
-### Le récit : « Mobilités douces, ville plus chaude »
-
-La page autonome **[recit.html](recit.html)** complète l’outil cartographique. Sa question : **les mobilités douces encouragées sont-elles confortables dans une ville qui se réchauffe ?** Elle relie six étapes : projections de jours très chauds, fréquentation et ombre des abords des stations, accès aux fontaines, disponibilité de l’ombre et du soleil selon la saison et l’heure, compromis d’itinéraire, puis croissance conditionnelle des arbres vers 2036.
+La page autonome **[Dataviz](https://canopee-delta.vercel.app/dataviz)** complète l’outil cartographique. Sa question : **les mobilités douces encouragées sont-elles confortables dans une ville qui se réchauffe ?** Elle relie six étapes : projections de jours très chauds, fréquentation et ombre des abords des stations, accès aux fontaines, disponibilité de l’ombre et du soleil selon la saison et l’heure, compromis d’itinéraire, puis croissance conditionnelle des arbres vers 2036.
 
 Elle contient une animation des 601 secteurs hexagonaux de Paris, un graphique climatique à points et intervalles, un nuage de points interactif sur 159 stations rapprochées, une distribution des distances aux fontaines (223 à 250 m ou moins, 66 entre 251 et 500 m, 3 au-delà), une courbe horaire été/hiver, une matrice de 180 valeurs d’ombre, 24 comparaisons de trajets et un graphique avant/après du scénario arboré. La matrice présente douze stations choisies pour illustrer différents quartiers, sans prétendre représenter tout le réseau. Les sources, tableaux et données téléchargeables accompagnent les graphiques. L’outil reste dans `index.html`, et les liens du récit ouvrent directement une station ou un trajet avec son heure, sa saison et sa préférence d’exposition. Le récit règle `accept=50` pour le plus court, `accept=0` pour chercher l’ombre et `accept=100` pour chercher le soleil, selon la nouvelle signature du routeur. Les petits plans emploient les vrais contours bâtis et les couleurs des rues du modèle.
 
@@ -22,9 +20,13 @@ Les validations ferroviaires 2025 sont les agrégats IDFM publiés par **Projet_
 
 Les références de présentation comprennent Trajemploi, Voyager la nuit/travailler la nuit, Team Datalab et EcloWork. Les graphiques sont redessinés pour Canopée ; les ombres et comparaisons de trajets sont nos propres calculs. La page conserve les attributions de données dans les sources, sans section consacrée aux inspirations.
 
-Pour ouvrir le récit : http://localhost:5173/recit.html. Pour régénérer ses calculs depuis les données préparées (fichiers binaires compressés inclus) : `npm run prepare-story`. Pour réextraire les validations de la version exacte publiée par l’équipe 3 : `python3 scripts/import-hackaviz-traffic.py` (Git blob vérifié, HTML jamais exécuté), puis régénérer le récit. Les invariants de données, des 24 comparaisons et de l’échelle commune se vérifient avec `node --test tests/story.test.mjs tests/story-geometry.test.mjs`. `npm run build` produit les deux pages.
+Pour ouvrir le récit : http://localhost:5173/dataviz. Pour régénérer ses calculs depuis les données préparées (fichiers binaires compressés inclus) : `npm run prepare-story`. Pour réextraire les validations de la version exacte publiée par l’équipe 3 : `python3 scripts/import-hackaviz-traffic.py` (Git blob vérifié, HTML jamais exécuté), puis régénérer le récit. Les invariants de données, des 24 comparaisons et de l’échelle commune se vérifient avec `node --test tests/story.test.mjs tests/story-geometry.test.mjs`. `npm run build` produit les deux pages.
 
 La conclusion présente une scène MapLibre 3D tournante du quartier République–Arts et Métiers, avec hauteurs réelles IGN, ombres portées selon la même enveloppe convexe que l’outil, et un trajet calculé. Les données `story-preview.json` sont régénérées avec le récit. La rotation s’arrête hors écran ou en arrière-plan, se met en pause manuellement, et respecte la réduction des animations du système. Les abris-bus et pistes cyclables sont des pistes d’analyse, pas des résultats mesurés dans ce récit.
+
+#### Fusion des branches
+
+Le récit du commit `8a648c3` est servi publiquement à `/dataviz`. Son fichier source reste `recit.html`. Conserver les deux entrées dans `vite.config.js`, la réécriture de `/dataviz` dans `vercel.json` et le lien de navigation dans `index.html`. Dans `src/main.js`, `openStorySelection()` ouvre les liens de stations et de trajets depuis le récit avec leurs paramètres d’heure, de saison et de soleil. Les modifications du récit se font dans `recit.html` et `src/story*.js`. Les comparaisons du récit conservent leur hypothèse de 4,5 km/h à pied. La carte estime la marche à 5 km/h. Vérifier la fusion avec `node --test tests/*.test.mjs` et `npm run build`.
 
 ### Le problème et la proposition de valeur
 
@@ -47,7 +49,9 @@ Le prototype croise 292 points représentatifs de gares et stations ferrées d'�
 
 #### Itinéraire canicule
 
-Entrer une adresse de départ et une destination, puis choisir les résultats du géocodeur. On peut aussi cliquer deux points sur la carte. Le trajet favorise l'ombre des immeubles. La durée est une estimation à 75 m/min. Le résultat indique les fontaines et lieux frais à moins de 80 m du tracé. Cliquer une fontaine ou un lieu frais gratuit permet de l'ajouter comme étape.
+Entrer une adresse de départ et une destination, puis choisir les résultats du géocodeur. On peut aussi cliquer deux points sur la carte. Le cran Normal minimise la distance et sert de référence aux crans de soleil. Le résultat indique les fontaines, lieux frais et parcs à moins de 80 m du tracé. Cliquer une fontaine ou un lieu frais gratuit permet de l'ajouter comme étape.
+
+À pied et à vélo personnel, Canopée estime la durée d’après le tracé entre le départ et l’arrivée, à 5 km/h à pied et à 15 km/h à vélo. En Vélib, Canopée sélectionne les stations de prise et de dépôt les plus proches à vol d’oiseau des extrémités parmi celles reliées au trajet. La durée totale additionne les deux portions à pied et le trajet entre les stations, hors temps de prise et de dépôt. Le cran de soleil s’applique à la portion à vélo. Le graphe de rues est commun aux deux modes. Les restrictions cyclables, les sens de circulation et la disponibilité en station restent à vérifier.
 
 Les horaires, l'accessibilité réelle des entrées et la disponibilité d'un équipement doivent être vérifiés avant le déplacement. La canopée est estimée par un modèle simple ; le trajet ne garantit pas l'ombre réelle et ne mesure pas la température ressentie.
 
@@ -72,6 +76,8 @@ Ouvrir http://localhost:5173/. Choisir deux adresses pour le trajet, puis bascul
 
 `npm run build` produit le site statique dans `dist/`, données comprises. Le chemin des ressources est relatif pour permettre un hébergement dans un sous-dossier. Pour régénérer les données depuis les sources ouvertes, lancer `npm run prepare-data` avec une connexion réseau et environ 8 Go de mémoire disponibles ; les téléchargements WFS déjà écrits dans `data/raw/` sont repris au prochain lancement.
 
+`npm run prepare-velib` actualise le GeoJSON Vélib indépendamment du reste. L’export officiel est filtré selon le contour parisien de `scene.json`. Le relevé du 13 novembre 2026 contient 996 stations dans ce périmètre.
+
 ## Données et méthode
 
 | Élément | Source | Licence |
@@ -79,11 +85,14 @@ Ouvrir http://localhost:5173/. Choisir deux adresses pour le trajet, puis bascul
 | Bâtiments, hauteurs et axes | [IGN BD TOPO, Géoplateforme WFS](https://data.geopf.fr/wfs/ows) | Licence Ouverte |
 | Contour de Paris | [API Géo](https://geo.api.gouv.fr/communes/75056?fields=contour&format=geojson&geometry=contour) | Licence Ouverte |
 | Température du 25 juin 2026 | [Météo-France, données horaires](https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-horaires) | Licence Ouverte |
+| Météo en mode Direct | [Open-Meteo](https://open-meteo.com/en/license) | CC BY 4.0 pour les données de l’API |
 | Fontaines | [Eau de Paris / Paris Data](https://opendata.paris.fr/explore/dataset/fontaines-a-boire/) | ODbL |
 | Équipements frais | [Ville de Paris / Paris Data](https://opendata.paris.fr/explore/dataset/ilots-de-fraicheur-equipements-activites/) | ODbL |
 | Espaces verts frais | [Ville de Paris / Paris Data](https://opendata.paris.fr/explore/dataset/ilots-de-fraicheur-espaces-verts-frais/) | ODbL |
 | Arbres, hauteur et stade de développement | [Ville de Paris / Paris Data](https://opendata.paris.fr/explore/dataset/les-arbres/) | ODbL |
 | Gares et stations du réseau ferré, points généralisés | [Île-de-France Mobilités](https://data.iledefrance-mobilites.fr/explore/dataset/emplacement-des-gares-idf-data-generalisee/) | Licence Ouverte v2 |
+| Validations ferroviaires 2025 | [IDFM / PRIM](https://prim.iledefrance-mobilites.fr/jeux-de-donnees/histo-validations-reseau-ferre), agrégats repris du dépôt public [Projet_equipe_3](https://github.com/hackathons-mobilites/hackaviz_2026/pull/6) | ODbL pour la source IDFM |
+| Localisation et capacité des stations Vélib | [Smovengo / Syndicat Autolib’ Vélib’ Métropole, via Open Data Paris](https://opendata.paris.fr/explore/dataset/velib-emplacement-des-stations/) | ODbL 1.0 |
 | Projets de transport | [Île-de-France Mobilités](https://data.iledefrance-mobilites.fr/explore/dataset/projets_lignes_idf/) | Licence Ouverte |
 | Adresses | [Base Adresse Nationale, service de géocodage Géoplateforme](https://adresse.data.gouv.fr/outils/api-doc/adresse) | Service public |
 | Fond de carte | [OpenFreeMap](https://openfreemap.org/) / OpenStreetMap | ODbL |

@@ -3,15 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%231d1d1f'/%3E%3C/svg%3E" />
+    <link rel="icon" href="./canopee-icon.png" />
     <title>Canopée</title>
-    <meta name="description" content="Itinéraire à pied à Paris, à l’ombre en été et au soleil en hiver." />
+    <meta name="description" content="Itinéraires à pied, à vélo et en Vélib à Paris, selon l’ensoleillement des rues." />
   </head>
   <body>
     <a class="skip" href="#carte">Aller à la carte</a>
     <div id="carte" role="region" aria-label="Carte de l’ombre à Paris"></div>
 
     <aside id="recit">
+      <img class="logo" src="./canopee-logo.webp" alt="Canopée" width="640" height="165" />
       <div class="itineraire">
         <div class="trajet-groupe">
           <form id="form-a" class="champ">
@@ -35,12 +36,14 @@
         <div class="trajet-outils">
           <button type="button" id="effacer">Effacer</button>
         </div>
-        <div class="segments" id="allure" role="group" aria-label="Allure">
+        <div class="segments" id="allure" role="group" aria-label="Mode de déplacement">
           <button type="button" id="allure-pied" aria-pressed="true">À pied</button>
-          <button type="button" id="allure-velo" aria-pressed="false">À vélo</button>
+          <button type="button" id="allure-velo" aria-pressed="false">Vélo</button>
+          <button type="button" id="allure-velib" aria-pressed="false">Vélib</button>
         </div>
-        <p class="trajet-resultat" id="trajet-resultat" aria-live="polite">Chargement de Paris…</p>
-        <p class="temps-velo" id="temps-velo" hidden></p>
+        <div class="trajet-resultat" id="trajet-resultat">Chargement de Paris…</div>
+        <p class="trajet-comparaison" id="trajet-comparaison" hidden></p>
+        <ol class="trajet-etapes" id="trajet-etapes" hidden></ol>
         <p class="trajet-contexte" id="trajet-contexte"></p>
       </div>
 
@@ -58,6 +61,7 @@
       <div class="soleil-crans" id="soleil-crans" role="group" aria-label="Soleil">
         <button type="button" data-accept="0" aria-pressed="true">Pas de soleil</button>
         <button type="button" data-accept="33" aria-pressed="false">Un peu</button>
+        <button type="button" data-accept="50" aria-pressed="false">Normal</button>
         <button type="button" data-accept="67" aria-pressed="false">Beaucoup</button>
         <button type="button" data-accept="100" aria-pressed="false">Plein soleil</button>
       </div>
@@ -84,13 +88,22 @@
         <button type="button" id="stations-toutes" class="texte">Toutes les stations</button>
       </details>
 
-      <button type="button" class="texte" id="ouvrir-methode">Sources</button>
-      <a class="texte" href="./recit.html" style="display: inline-block; margin-left: 16px; text-decoration: none">Le récit ↗</a>
+      <div class="liens-carte">
+        <button type="button" class="texte" id="ouvrir-methode">Sources</button>
+        <a class="texte" href="./dataviz">Dataviz</a>
+      </div>
     </aside>
 
-    <div class="vue-carte" role="group" aria-label="Choisir la vue de la carte">
-      <button type="button" id="vue-dessus" aria-pressed="true">Vue du dessus</button>
-      <button type="button" id="vue-inclinee" aria-pressed="false">Vue 3D inclinée</button>
+    <div class="vues-carte" role="group" aria-label="Commandes de la carte">
+      <div class="commandes-carte" id="commandes-carte"></div>
+      <p class="aide-rotation" id="aide-rotation" hidden>
+        <span class="aide-souris">Pour tourner la carte, maintenez <kbd id="touche-rotation">Ctrl</kbd> et faites glisser.</span>
+        <span class="aide-tactile">Tournez la carte à deux doigts.</span>
+      </p>
+      <div class="segments vue-carte" role="group" aria-label="Choisir la vue de la carte">
+        <button type="button" id="vue-dessus" aria-pressed="true">Vue du dessus</button>
+        <button type="button" id="vue-inclinee" aria-pressed="false">Vue 3D inclinée</button>
+      </div>
     </div>
 
     <section class="heure-dock" aria-label="Heure">
@@ -100,6 +113,7 @@
         </button>
         <div class="heure-centre">
           <p class="heure" id="heure-lue"><span id="heure-nombre">16</span><span id="heure-unite"> h</span></p>
+          <p class="meteo" id="meteo"></p>
         </div>
         <button type="button" id="suivant" aria-label="Heure suivante">
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -114,16 +128,20 @@
     </section>
 
     <aside class="cle" id="cle" aria-label="Légende">
-      <span class="cle-titre">Lire la carte <small id="lecture-mode">Ombre moyenne des rues par secteur</small></span>
+      <div class="cle-entete">
+        <h2 class="cle-titre">Légende</h2>
+        <button type="button" class="cle-info" id="cle-info" aria-label="À propos des couleurs" aria-expanded="false" aria-controls="lecture-mode"><span aria-hidden="true">i</span></button>
+      </div>
+      <p id="lecture-mode" class="cle-detail" hidden>Ombre moyenne des rues par secteur</p>
       <span class="sr-only">Part d’ombre, de exposé à ombragé.</span>
       <div class="echelle" id="degrade">
         <span class="echelle-mot">Exposé</span>
         <span class="hexes" aria-hidden="true">
           <i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i>
         </span>
+        <span class="echelle-barre" aria-hidden="true"></span>
         <span class="echelle-mot">Ombragé</span>
       </div>
-      <p class="nuancier-titre">Île-de-France Mobilités</p>
       <ul class="symboles">
         <li>
           <label class="symbole">

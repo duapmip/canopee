@@ -1,11 +1,11 @@
 /**
  * Chemin sur les segments de 6 m déjà calculés.
- * Été : un mètre au soleil coûte plus cher. Hiver : un mètre à l’ombre coûte plus cher.
+ * Le coût des segments dépend du cran de soleil choisi.
  */
 
 const CELL = 0.0011;
 const MAX_SNAP_M = 60;
-const PREFERENCE = 30;
+const SUN_PENALTY = { 0: 30, 33: 0.55, 50: 0, 67: 1.25, 100: 30 };
 const LAT0 = 48.8566;
 const LON0 = 2.3522;
 const M_LAT = 111132.92 - 559.82 * Math.cos((2 * LAT0 * Math.PI) / 180);
@@ -323,6 +323,30 @@ export function createRouter(buffer, inside, treeBuffer) {
     return { ok: true, lon: best.lon, lat: best.lat, t: best.t, edge: best.edge, gap: best.gap };
   }
 
+  let components;
+  function component(edge) {
+    if (!components) {
+      components = new Int32Array(nNodes).fill(-1);
+      const queue = new Int32Array(nNodes);
+      for (let start = 0; start < nNodes; start++) {
+        if (components[start] !== -1) continue;
+        components[start] = start;
+        queue[0] = start;
+        let end = 1;
+        for (let i = 0; i < end; i++) {
+          const node = queue[i];
+          for (let k = off[node]; k < off[node + 1]; k++) {
+            const next = adjTo[k];
+            if (components[next] !== -1) continue;
+            components[next] = start;
+            queue[end++] = next;
+          }
+        }
+      }
+    }
+    return components[from[edge]];
+  }
+
   function plan(lonA, latA, lonB, latB, season, hourIndex, future = false, live = null, accept = 0) {
     const a = snap(lonA, latA);
     if (!a.ok) return a;
@@ -344,14 +368,13 @@ export function createRouter(buffer, inside, treeBuffer) {
         ? live.fraction(edge, ax[edge], ay[edge], bx[edge], by[edge])
         : share(edge, hourIndex, season, future)
     );
-    const pull = Math.max(-1, Math.min(1, (Number(accept) - 50) / 50));
-    const strength = Math.abs(pull);
+    const penalty = SUN_PENALTY[accept] ?? 0;
     const factor = (edge) => {
-      if (!sunUp || strength === 0) return 1;
+      if (!sunUp || penalty === 0) return 1;
       const frac = fracOf(edge);
       if (!(frac >= 0)) return 1;
-      const exposure = pull > 0 ? frac : 1 - frac;
-      return 1 + PREFERENCE * strength * exposure;
+      const exposure = accept > 50 ? frac : 1 - frac;
+      return 1 + penalty * exposure;
     };
 
     const extras = new Map();
@@ -487,7 +510,7 @@ export function createRouter(buffer, inside, treeBuffer) {
       const t1 = tOf(chain[i], edge);
       if (t0 == null || t1 == null) continue;
       const portion = Math.abs(t1 - t0) * len[edge];
-      if (portion < 0.4) continue;
+      if (portion === 0) continue;
       const s = fracOf(edge);
       const lon0 = ax[edge] + (bx[edge] - ax[edge]) * t0;
       const lat0 = ay[edge] + (by[edge] - ay[edge]) * t0;
@@ -586,7 +609,7 @@ export function createRouter(buffer, inside, treeBuffer) {
     return { type: "FeatureCollection", features };
   }
 
-  return { nEdges, nChunks, farCollection, overviewCollection, liveFar, liveOverview, edgesIn, nearCollection, coloredEdges, shadeAround, snap, plan };
+  return { nEdges, nChunks, farCollection, overviewCollection, liveFar, liveOverview, edgesIn, nearCollection, coloredEdges, shadeAround, snap, component, plan };
 }
 
 export function indexBuildings(buffer) {

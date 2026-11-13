@@ -76,6 +76,50 @@ function prism(dst, cx, cy, z0, z1, radius, sides, color) {
   }
 }
 
+function bicycle(dst, x, color) {
+  const tire = rgb("#172d30");
+  const rim = rgb("#aac7c4");
+  for (const y of [-0.88, 0.88]) {
+    for (let i = 0; i < 12; i++) {
+      const ring = (side, radius, step) => {
+        const angle = step / 12 * TAU;
+        return [x + side, y + Math.cos(angle) * radius, 0.52 + Math.sin(angle) * radius];
+      };
+      for (const side of [-0.09, 0.09]) {
+        quad(dst, ring(side, 0.5, i), ring(side, 0.5, i + 1), ring(side, 0.37, i + 1), ring(side, 0.37, i), tire);
+      }
+      quad(dst, ring(-0.09, 0.5, i), ring(-0.09, 0.5, i + 1), ring(0.09, 0.5, i + 1), ring(0.09, 0.5, i), tire);
+    }
+    box(dst, x, y, 0.17, 0.07, 0.07, 0.7, rim);
+  }
+  const frame = ([y0, z0], [y1, z1], thickness, paint = color) => {
+    const length = Math.hypot(y1 - y0, z1 - z0);
+    const dy = (z0 - z1) / length * thickness;
+    const dz = (y1 - y0) / length * thickness;
+    const a = [x - thickness, y0 + dy, z0 + dz];
+    const b = [x - thickness, y1 + dy, z1 + dz];
+    const c = [x + thickness, y1 + dy, z1 + dz];
+    const d = [x + thickness, y0 + dy, z0 + dz];
+    quad(dst, a, b, c, d, paint);
+    for (const side of [-thickness, thickness]) {
+      quad(dst, [x + side, y0 - dy, z0 - dz], [x + side, y1 - dy, z1 - dz], [x + side, y1 + dy, z1 + dz], [x + side, y0 + dy, z0 + dz], shade(paint, 0.9));
+    }
+  };
+  const rear = [-0.88, 0.52];
+  const crank = [-0.12, 0.49];
+  const seat = [-0.49, 1.22];
+  const front = [0.54, 1.21];
+  frame(rear, seat, 0.07);
+  frame(rear, crank, 0.07);
+  frame(crank, seat, 0.075);
+  frame(crank, front, 0.13);
+  frame(front, [0.88, 0.52], 0.07);
+  frame(front, [0.47, 1.52], 0.06, rim);
+  box(dst, x, -0.52, 1.22, 0.23, 0.37, 0.09, tire);
+  box(dst, x, 0.47, 1.52, 0.56, 0.1, 0.08, tire);
+  box(dst, x, 1.18, 0.06, 0.31, 0.32, 0.77, rgb("#52747b"));
+}
+
 function buildModels() {
   const fountain = [];
   prism(fountain, 0, 0, 0.15, 1.15, 2.4, 8, rgb("#0878ad"));
@@ -83,17 +127,30 @@ function buildModels() {
   prism(fountain, 0, 0, 1.15, 3.1, 0.28, 6, rgb("#f4f7f8"));
 
   const velib = [];
-  prism(velib, 0, 0, 0.12, 1.35, 1.7, 6, rgb("#0b6e4f"));
-  prism(velib, 0, 0, 1.35, 1.62, 2.05, 6, rgb("#d7f3ea"));
+  box(velib, 0, 0, 0.02, 5.4, 2.9, 0.045, rgb("#dce8e3"));
+  for (const [x, color] of [[-1.8, "#79ad42"], [-0.6, "#3896ce"], [0.6, "#79ad42"], [1.8, "#3896ce"]]) {
+    bicycle(velib, x, rgb(color));
+  }
 
   const metro = [];
-  box(metro, 0, 0, 0.05, 4.2, 2.2, 0.18, rgb("#214c83"));
-  box(metro, -1.7, -0.7, 0.2, 0.18, 0.18, 2.15, rgb("#d5dbe3"));
-  box(metro, 1.7, -0.7, 0.2, 0.18, 0.18, 2.15, rgb("#d5dbe3"));
-  box(metro, -1.7, 0.7, 0.2, 0.18, 0.18, 2.15, rgb("#d5dbe3"));
-  box(metro, 1.7, 0.7, 0.2, 0.18, 0.18, 2.15, rgb("#d5dbe3"));
-  box(metro, 0, 0, 2.3, 4.6, 2.5, 0.16, rgb("#16325c"));
-  box(metro, 0, 0.95, 0.2, 3.2, 0.12, 1.5, rgb("#e8eef6"));
+  const railing = rgb("#245449");
+  box(metro, 0, 0, 0.04, 3.7, 4.5, 0.08, rgb("#163039"));
+  for (let step = 0; step < 7; step++) {
+    box(metro, 0, -1.77 + step * 0.48, 0.12, 3.2, 0.48, 0.22 + (6 - step) * 0.13, rgb("#bac8c8"));
+  }
+  for (const x of [-1.77, 1.77]) {
+    box(metro, x, 0, 0.12, 0.18, 4.35, 0.44, railing);
+    box(metro, x, 0, 1.42, 0.16, 4.4, 0.12, railing);
+    for (let post = 0; post < 7; post++) box(metro, x, -2.1 + post * 0.7, 0.55, 0.09, 0.09, 0.88, railing);
+    box(metro, x, -2.1, 0.55, 0.17, 0.17, 2.68, railing);
+  }
+  box(metro, 0, -2.1, 2.75, 3.75, 0.25, 0.65, rgb("#a93034"));
+  for (const y of [-2.24, -1.96]) {
+    const letter = rgb("#fff1ce");
+    for (const x of [-0.23, 0.23]) box(metro, x, y, 2.88, 0.07, 0.02, 0.39, letter);
+    for (const x of [-0.12, 0.12]) box(metro, x, y, 3.03, 0.2, 0.02, 0.08, letter);
+    box(metro, 0, y, 2.96, 0.08, 0.02, 0.13, letter);
+  }
 
   const bus = [];
   box(bus, 0, 0, 0.05, 3.1, 1.35, 0.12, rgb("#c4b08a"));
@@ -643,6 +700,7 @@ export function createPlaceVolumes(map) {
     const next = [
       map.getPitch() > 2 ? 1 : 0,
       zoom.toFixed(2),
+      Math.round(map.getBearing() / 5),
       center.lng.toFixed(4),
       center.lat.toFixed(4),
       show.water ? 1 : 0,

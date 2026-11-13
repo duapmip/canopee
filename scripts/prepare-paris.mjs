@@ -809,7 +809,7 @@ function parseMeteo() {
     const poste = c[iPoste];
     if (!stations[poste] || !c[iDate].startsWith("20260625")) continue;
     const local = Number(c[iDate].slice(8, 10)) + 2;
-    const t = Number(c[iT]);
+    const t = c[iT]?.trim() ? Number(c[iT]) : NaN;
     stations[poste].name = c[iNom] || stations[poste].name;
     if (Number.isFinite(t)) stations[poste].hours[local] = t;
   }

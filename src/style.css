@@ -5,7 +5,7 @@
   --voile: rgba(255, 255, 255, 0.42);
   --piste: rgba(255, 255, 255, 0.34);
   --ombre-carte: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
-  --trajet: #7a2be2;
+  --trajet: #142b44;
   color: var(--encre);
   font-family: "Source Sans 3", Arial, sans-serif;
   font-size: 15px;
@@ -55,7 +55,8 @@ button, input { font: inherit; color: inherit; }
 
 #recit,
 .cle,
-.heure-dock {
+.heure-dock,
+.vues-carte {
   background: var(--voile);
   -webkit-backdrop-filter: blur(22px) saturate(1.7);
   backdrop-filter: blur(22px) saturate(1.7);
@@ -77,6 +78,49 @@ button, input { font: inherit; color: inherit; }
 }
 
 .itineraire { margin: 0; }
+.logo { display: block; width: 156px; height: auto; margin: 4px 0 10px; }
+.vues-carte {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 66px;
+  width: 248px;
+  padding: 5px;
+}
+.vues-carte .vue-carte { margin: 0; }
+.liens-carte { display: flex; align-items: center; gap: 14px; }
+.commandes-carte {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 4px 0;
+  gap: 8px;
+}
+.aide-rotation {
+  margin: 0 0 5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #414b58;
+  font-size: 13px;
+}
+.aide-rotation kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid #cad4df;
+  border-radius: 5px;
+  background: #f6f8fb;
+  box-shadow: 0 2px 0 #cad4df;
+  color: #142b44;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.aide-tactile { display: none; }
+@media (pointer: coarse) {
+  .aide-tactile { display: inline; }
+  .aide-souris { display: none; }
+}
 
 .trajet-groupe {
   position: relative;
@@ -209,28 +253,36 @@ button, input { font: inherit; color: inherit; }
 .stat-chiffre {
   display: flex;
   align-items: baseline;
-  gap: 5px;
   min-width: 0;
 }
+.stat-unite { white-space: nowrap; }
+.stat-unite + .stat-unite { margin-left: 0.48rem; }
 .stat strong {
   font-size: 16px;
   font-weight: 650;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.stat-chiffre span {
+.stat-unite > span {
   color: var(--secondaire);
   font-size: 13px;
   font-weight: 600;
 }
-.stat-temps strong { font-size: 32px; }
-.stat-temps .stat-chiffre span { color: var(--encre); font-size: 16px; }
-.temps-velo {
+.stat-temps strong { font-size: 36px; }
+.stat-temps .stat-unite > span { color: var(--encre); font-size: 16px; }
+.trajet-comparaison {
   margin: 6px 2px 0;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  color: var(--secondaire);
 }
-.temps-velo[hidden] { display: none; }
+.trajet-etapes {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 0 0 8px;
+  border-left: 2px solid var(--trajet);
+  font-size: 13px;
+}
+.trajet-etapes li + li { margin-top: 3px; }
 .trajet-contexte {
   display: flex;
   align-items: center;
@@ -291,18 +343,10 @@ button, input { font: inherit; color: inherit; }
   font-size: 12px;
   font-weight: 500;
 }
-.objectif .suite.ligne-meteo {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-  color: var(--encre);
-  font-size: 15px;
-  font-weight: 600;
-}
 .objectif .suite:empty { display: none; }
 .soleil-crans {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   margin-top: 10px;
   padding: 4px;
@@ -312,6 +356,7 @@ button, input { font: inherit; color: inherit; }
   backdrop-filter: blur(22px);
 }
 .soleil-crans button {
+  grid-column: span 2;
   border: 0;
   border-radius: 7px;
   min-height: 32px;
@@ -321,6 +366,7 @@ button, input { font: inherit; color: inherit; }
   font-weight: 650;
   cursor: pointer;
 }
+.soleil-crans button:nth-child(n + 4) { grid-column: span 3; }
 .soleil-crans button[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
@@ -381,35 +427,10 @@ button, input { font: inherit; color: inherit; }
 .stations-liste span { color: var(--secondaire); font-size: 12px; }
 #ouvrir-methode { margin-top: 8px; }
 
-.vue-carte {
-  position: absolute;
-  z-index: 2;
-  left: 12px;
-  bottom: 16px;
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--voile);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7);
-  backdrop-filter: blur(22px) saturate(1.7);
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 12px;
-  box-shadow: var(--ombre-carte);
-}
 .vue-carte button {
-  border: 0;
-  background: transparent;
-  border-radius: 9px;
-  min-height: 36px;
-  padding: 0 12px;
-  color: var(--encre);
+  min-height: 32px;
   font-size: 14px;
   font-weight: 650;
-  cursor: pointer;
-}
-.vue-carte button[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .heure-dock {
@@ -440,7 +461,10 @@ button, input { font: inherit; color: inherit; }
   font-size: 17px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+.meteo { margin: 0; color: #414b58; font-size: 13px; white-space: nowrap; }
+.meteo:empty { display: none; }
 .heure-ligne button {
   width: 28px;
   height: 28px;
@@ -494,24 +518,29 @@ button, input { font: inherit; color: inherit; }
   position: absolute;
   z-index: 2;
   top: 12px;
-  right: 52px;
+  right: 60px;
   width: 248px;
   max-height: calc(100vh - 24px);
   overflow: auto;
   padding: 10px 12px 8px;
 }
-.cle-titre {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
+.cle-entete { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cle-titre { margin: 0; font-size: 14px; font-weight: 700; }
+.cle-info {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #425874;
+  cursor: pointer;
 }
-.cle-titre small {
-  display: block;
-  margin-top: 2px;
-  color: var(--secondaire);
-  font-size: 12px;
-  font-weight: 400;
-}
+.cle-info span { border: 1px solid currentColor; border-radius: 50%; width: 16px; line-height: 14px; font-size: 11px; font-weight: 700; }
+.cle-info:hover, .cle-info[aria-expanded="true"] { background: rgba(255, 255, 255, 0.7); }
+.cle-detail { margin: 2px 0 0; color: #414b58; font-size: 12px; }
 .echelle {
   display: flex;
   align-items: center;
@@ -536,6 +565,15 @@ button, input { font: inherit; color: inherit; }
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   background: #5BA3D9;
 }
+.echelle-barre {
+  display: none;
+  flex: 1;
+  height: 9px;
+  border-radius: 5px;
+  background: var(--degrade-ombre, linear-gradient(90deg, #F4D27A, #5BA3D9, #0055A4));
+}
+.echelle-rues .hexes { display: none; }
+.echelle-rues .echelle-barre { display: block; }
 .nuancier { margin-top: 8px; }
 .nuancier-titre { margin: 0 0 6px; font-size: 12px; font-weight: 650; }
 .presets { display: flex; flex-direction: column; gap: 4px; }
@@ -644,11 +682,61 @@ button, input { font: inherit; color: inherit; }
   font-size: 14px;
 }
 
-.maplibregl-ctrl-group {
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: var(--ombre-carte);
+.commandes-carte .maplibregl-ctrl-group {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--piste);
+  box-shadow: none;
+}
+.commandes-carte .maplibregl-ctrl-group button {
+  width: 34px;
+  height: 34px;
   border: 0;
+  border-radius: 8px;
+}
+.commandes-carte .maplibregl-ctrl-group button:hover { background-color: rgba(255, 255, 255, 0.72); }
+.commandes-carte .maplibregl-ctrl-group button:focus-visible { outline-offset: -2px; }
+.commandes-carte .maplibregl-ctrl-group .maplibregl-ctrl-icon { opacity: 0.78; }
+.commandes-carte :is(.maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out) .maplibregl-ctrl-icon {
+  position: relative;
+  background-image: none;
+  color: var(--trajet);
+  opacity: 1;
+}
+.commandes-carte :is(.maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out) .maplibregl-ctrl-icon::before,
+.commandes-carte .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+.commandes-carte .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::after { transform: translate(-50%, -50%) rotate(90deg); }
+.commandes-carte .maplibregl-ctrl-group button:disabled .maplibregl-ctrl-icon { opacity: 0.35; }
+.commandes-carte .maplibregl-ctrl-scale {
+  position: relative;
+  flex: none;
+  padding: 0 0 7px;
+  border: 0;
+  background: transparent;
+  color: var(--trajet);
+  font: 600 12px/1.35 "Source Sans 3", Arial, sans-serif;
+  white-space: nowrap;
+  text-align: center;
+}
+.commandes-carte .maplibregl-ctrl-scale::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 4px;
+  height: 4px;
+  border: 1px solid currentColor;
+  border-top: 0;
 }
 .maplibregl-ctrl-attrib {
   font-size: 10px;
@@ -676,6 +764,10 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.28); }
 #methode th, #methode td { text-align: left; padding: 4px 6px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
 #methode caption { text-align: left; margin-bottom: 6px; }
 
+@media (max-width: 1000px) {
+  .vues-carte { bottom: 132px; }
+}
+
 @media (max-width: 760px) {
   #recit {
     top: 8px;
@@ -686,18 +778,15 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.28); }
   .cle {
     top: auto;
     right: 8px;
-    bottom: 92px;
+    bottom: 254px;
     width: min(210px, calc(100% - 16px));
+    max-height: min(24vh, clamp(90px, calc(54dvh - 266px), 222px));
   }
+  .vues-carte { right: 8px; bottom: 128px; width: min(248px, calc(100% - 16px)); }
   .heure-dock {
     left: 50%;
     bottom: 8px;
     width: calc(100% - 16px);
     transform: translateX(-50%);
   }
-  .vue-carte {
-    left: 8px;
-    bottom: 118px;
-  }
-  .maplibregl-ctrl-top-right { top: auto; bottom: 92px; }
 }
