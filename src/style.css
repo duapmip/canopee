@@ -5,6 +5,7 @@
   --voile: rgba(255, 255, 255, 0.42);
   --piste: rgba(255, 255, 255, 0.34);
   --ombre-carte: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
+  --trajet: #7a2be2;
   color: var(--encre);
   font-family: "Source Sans 3", Arial, sans-serif;
   font-size: 15px;
@@ -94,13 +95,18 @@ button, input { font: inherit; color: inherit; }
 .champ + .champ { box-shadow: inset 0 1px 0 var(--filet); }
 
 .point {
-  width: 8px;
-  height: 8px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   flex: none;
+  background: var(--trajet);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
-.point-a { background: #34c759; }
-.point-b { background: #ff3b30; }
 
 .champ input {
   flex: 1;
@@ -183,29 +189,48 @@ button, input { font: inherit; color: inherit; }
 .trajet-resultat:empty { display: none; }
 .trajet-cartes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin: 8px 0 0;
 }
 .stat {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   padding: 8px 8px 7px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.55);
 }
-.stat svg { width: 18px; height: 18px; }
+.stat-temps { grid-column: 1 / -1; padding: 10px 12px; }
+.stat svg { width: 18px; height: 18px; flex: none; }
+.stat-chiffre {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
 .stat strong {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 650;
-  line-height: 1.15;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.stat span { color: var(--secondaire); font-size: 12px; font-weight: 500; }
+.stat-chiffre span {
+  color: var(--secondaire);
+  font-size: 13px;
+  font-weight: 600;
+}
+.stat-temps strong { font-size: 32px; }
+.stat-temps .stat-chiffre span { color: var(--encre); font-size: 16px; }
+.temps-velo {
+  margin: 6px 2px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.temps-velo[hidden] { display: none; }
 .trajet-contexte {
   display: flex;
   align-items: center;
@@ -216,6 +241,7 @@ button, input { font: inherit; color: inherit; }
   font-variant-numeric: tabular-nums;
 }
 .trajet-contexte svg { width: 16px; height: 16px; flex: none; }
+.trajet-contexte .passe { color: var(--secondaire); font-weight: 500; }
 .trajet-contexte:empty { display: none; }
 
 .segments {
@@ -265,7 +291,40 @@ button, input { font: inherit; color: inherit; }
   font-size: 12px;
   font-weight: 500;
 }
+.objectif .suite.ligne-meteo {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--encre);
+  font-size: 15px;
+  font-weight: 600;
+}
 .objectif .suite:empty { display: none; }
+.soleil-crans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(22px);
+}
+.soleil-crans button {
+  border: 0;
+  border-radius: 7px;
+  min-height: 32px;
+  background: transparent;
+  color: var(--encre);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.soleil-crans button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
 
 .stations { margin-top: 8px; }
 .stations summary {
@@ -399,6 +458,30 @@ button, input { font: inherit; color: inherit; }
   margin: 0;
   accent-color: #1d1d1f;
 }
+.heure-dock.is-live button:disabled,
+.lecture:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.heure-dock.is-live button:disabled:hover,
+.lecture:disabled:hover { background: transparent; }
+.lecture {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 2px auto 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--encre);
+  cursor: pointer;
+}
+.lecture:hover { background: rgba(0, 0, 0, 0.05); }
+.heure-dock.is-live input[type="range"]:disabled {
+  opacity: 1;
+  cursor: default;
+}
 .ticks {
   display: flex;
   justify-content: space-between;
@@ -429,19 +512,29 @@ button, input { font: inherit; color: inherit; }
   font-size: 12px;
   font-weight: 400;
 }
-.degrade {
-  display: block;
-  height: 8px;
-  margin-top: 8px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #da6840, #9f8172, #176778);
-}
-.deg-labels {
+.echelle {
   display: flex;
-  justify-content: space-between;
-  margin-top: 3px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.echelle-mot {
+  flex: none;
   color: var(--secondaire);
   font-size: 12px;
+}
+.hexes {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+}
+.hex {
+  width: 12px;
+  aspect-ratio: 0.866;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: #5BA3D9;
 }
 .nuancier { margin-top: 8px; }
 .nuancier-titre { margin: 0 0 6px; font-size: 12px; font-weight: 650; }
@@ -505,14 +598,19 @@ button, input { font: inherit; color: inherit; }
 .symbole svg { width: 18px; height: 18px; flex: none; }
 
 .borne {
-  width: 14px;
-  height: 14px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  background: var(--trajet);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
-.borne-a { background: #34c759; }
-.borne-b { background: #ff3b30; }
 
 .fiche .maplibregl-popup-content {
   background: rgba(255, 255, 255, 0.42);
