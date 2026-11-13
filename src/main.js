@@ -5,9 +5,10 @@ import "@fontsource/source-sans-3/latin-700.css";
 import * as maplibregl from "maplibre-gl";
 import { pct } from "./annotations.js";
 import { registerMapIcons } from "./map-icons.js";
+import { createLiveShade } from "./live-shade.js";
 import { createRouter, indexBuildings } from "./router.js";
 import { createPlaceVolumes, VOLUME_ZOOM } from "./place-volumes.js";
-import { shadowOffset } from "./sun.js";
+import { shadowOffset, sunPosition } from "./sun.js";
 import "./style.css";
 
 const scene = await fetch("data/scene.json").then((r) => r.json());
@@ -18,6 +19,22 @@ if (!scene.hours.includes(hour)) hour = 16;
 
 let season = "ete";
 let view = "today";
+const LIVE_LAT = 48.8462;
+const LIVE_LON = 2.3372;
+const HIGH_ALT = (35 * Math.PI) / 180;
+const live = {
+  on: false,
+  up: false,
+  altitude: 0,
+  azimuth: 0,
+  mode: "neutral",
+  weather: "wait",
+  cover: null,
+  temp: null,
+  label: "",
+};
+let liveShade = null;
+let weatherToken = 0;
 let pointA = null;
 let pointB = null;
 let selectedStop = null;
@@ -35,6 +52,8 @@ let armed = null;
 
 const el = {
   nombre: document.getElementById("heure-nombre"),
+  unite: document.getElementById("heure-unite"),
+  dock: document.querySelector(".heure-dock"),
   range: document.getElementById("heure"),
   direct: document.getElementById("direct"),
   precedent: document.getElementById("precedent"),
@@ -50,6 +69,11 @@ const el = {
   hiver: document.getElementById("saison-hiver"),
   today: document.getElementById("vue-aujourdhui"),
   future: document.getElementById("vue-future"),
+  now: document.getElementById("mode-direct"),
+  pied: document.getElementById("allure-pied"),
+  velo: document.getElementById("allure-velo"),
+  bikeTime: document.getElementById("temps-velo"),
+  velib: document.getElementById("couche-velib"),
   explanation: document.getElementById("vue-explication"),
   contexte: document.getElementById("trajet-contexte"),
   water: document.getElementById("couche-eau"),
@@ -66,13 +90,11 @@ const el = {
   vueInclinee: document.getElementById("vue-inclinee"),
 };
 
-const SHADE_PRESETS = {
-  ocre: ["#F6E3A1", "#E0A04A", "#3E4C59"],
-  idfm: ["#F4D27A", "#5BA3D9", "#0055A4"],
-  ratp: ["#F6E7C1", "#7BC47F", "#00843D"],
-  mixte: ["#F2C14E", "#0072CE", "#006B3F"],
-};
-let shadeStops = ["#da6840", "#9f8172", "#176778"];
+let shadeStops = ["#F4D27A", "#5BA3D9", "#0055A4"];
+let accept = 0;
+let allure = "pied";
+const WALK_M_PER_MIN = 75;
+const BIKE_KMH = 15;
 let activePreset = null;
 let paintingShade = false;
 
@@ -83,9 +105,18 @@ function shadeExpression(stops) {
   return ["interpolate", ["linear"], ["get", "s"], 0, stops[0], 1, stops[1]];
 }
 
-function applyShade(stops, presetId) {
-  shadeStops = stops.slice();
-  activePreset = presetId;
+function paintLegend(stops) {
+  const cells = [...document.querySelectorAll("#degrade .hex")];
+  const last = stops.length - 1;
+  cells.forEach((cell, index) => {
+    const t = cells.length <= 1 ? 0 : index / (cells.length - 1);
+    const scaled = t * last;
+    const i = Math.min(last - 1, Math.floor(scaled));
+    cell.style.background = mixHex(stops[i], stops[i + 1], scaled - i);
+  });
+}
+
+function paintExpression(stops) {
   const expression = shadeExpression(stops);
   for (const [id, prop] of [
     ["quartiers-ombre", "fill-color"],
@@ -94,12 +125,39 @@ function applyShade(stops, presetId) {
   ]) {
     if (map.getLayer(id)) map.setPaintProperty(id, prop, expression);
   }
-  const bar = document.getElementById("degrade");
-  if (bar) {
-    bar.style.background = stops.length >= 3
-      ? `linear-gradient(90deg, ${stops[0]}, ${stops[1]}, ${stops[2]})`
-      : `linear-gradient(90deg, ${stops[0]}, ${stops[1]})`;
-  }
+  paintLegend(stops);
+}
+
+function mixHex(a, b, t) {
+  const parse = (hex) => {
+    const h = String(hex).replace("#", "");
+    if (h.length !== 6) return null;
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  if (!pa || !pb) return a;
+  const mixed = pa.map((v, i) => Math.round(v + (pb[i] - v) * t));
+  return `#${mixed.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function tighten(stops) {
+  const mid = stops.length >= 3 ? stops[1] : mixHex(stops[0], stops[stops.length - 1], 0.5);
+  return stops.map((stop) => mixHex(stop, mid, 0.62));
+}
+
+function refreshGradient() {
+  const overcast = live.on && live.weather === "ok" && live.cover >= 50;
+  const stops = overcast ? tighten(shadeStops) : shadeStops;
+  paintLegend(stops);
+  if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) return;
+  paintExpression(stops);
+}
+
+function applyShade(stops, presetId) {
+  shadeStops = stops.slice();
+  activePreset = presetId;
+  refreshGradient();
   paintingShade = true;
   const expose = document.getElementById("couleur-expose");
   const ombre = document.getElementById("couleur-ombre");
@@ -142,6 +200,7 @@ function renderHour(h, speak) {
   el.nombre.textContent = String(h);
   el.range.value = String(h);
   el.range.setAttribute("aria-valuetext", `${h} heures`);
+  if (typeof renderCopy === "function") renderCopy();
   paintStreets();
   renderStations();
   if (pointA && pointB) drawRoute(speak);
@@ -152,6 +211,7 @@ function renderHour(h, speak) {
 }
 
 function step(delta) {
+  leaveLive();
   const index = scene.hours.indexOf(hour);
   renderHour(scene.hours[(index + delta + scene.hours.length) % scene.hours.length], true);
 }
@@ -175,15 +235,35 @@ function stopPlay() {
 function startPlay(userGesture) {
   if (playTimer) return;
   if (!userGesture && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const left = leaveLive();
   setPlayIcon(true);
   playTimer = setInterval(() => step(1), 1100);
+  if (left) {
+    renderCopy();
+    paintStreets();
+    renderStations();
+    if (pointA && pointB) drawRoute(false);
+  }
 }
 
-el.lecture.addEventListener("click", () => (playTimer ? stopPlay() : startPlay(true)));
-el.precedent.addEventListener("click", () => { stopPlay(); step(-1); });
-el.suivant.addEventListener("click", () => { stopPlay(); step(1); });
-el.range.addEventListener("input", () => { stopPlay(); renderHour(Number(el.range.value), true); });
+el.lecture.addEventListener("click", () => {
+  if (live.on) return;
+  if (playTimer) stopPlay();
+  else startPlay(true);
+});
+el.precedent.addEventListener("click", () => { if (live.on) return; stopPlay(); step(-1); });
+el.suivant.addEventListener("click", () => { if (live.on) return; stopPlay(); step(1); });
+el.range.addEventListener("input", () => {
+  if (live.on) {
+    syncDock();
+    return;
+  }
+  stopPlay();
+  leaveLive();
+  renderHour(Number(el.range.value), true);
+});
 window.addEventListener("keydown", (event) => {
+  if (live.on) return;
   if (event.target.closest("input, textarea, select, dialog[open] button")) return;
   if (event.key === "ArrowRight") {
     event.preventDefault();
@@ -208,7 +288,7 @@ const map = new maplibregl.Map({
   pitchWithRotate: true,
   touchPitch: true,
   attributionControl: true,
-  customAttribution: "Ombre : IGN BD TOPO et arbres de Paris. Eau et fraîcheur : Ville de Paris, Eau de Paris. Stations et projets : Île-de-France Mobilités. 41 °C : Météo-France",
+  customAttribution: "Ombre : IGN BD TOPO et arbres de Paris. Eau et fraîcheur : Ville de Paris, Eau de Paris. Stations et projets : Île-de-France Mobilités. Vélib : Vélib’ Métropole, Open Data Paris, ODbL. 41 °C : Météo-France",
   locale: {
     "NavigationControl.ResetBearing": "Glisser pour tourner, cliquer pour le nord",
     "NavigationControl.ZoomIn": "Zoomer",
@@ -219,19 +299,6 @@ map.touchZoomRotate.enableRotation();
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
 const placeVolumes = createPlaceVolumes(map);
-
-for (const button of document.querySelectorAll(".presets button")) {
-  button.addEventListener("click", () => applyShade(SHADE_PRESETS[button.dataset.preset], button.dataset.preset));
-}
-for (const input of [document.getElementById("couleur-expose"), document.getElementById("couleur-ombre")]) {
-  input.addEventListener("input", () => {
-    if (paintingShade) return;
-    const expose = document.getElementById("couleur-expose").value;
-    const ombre = document.getElementById("couleur-ombre").value;
-    const preset = Object.entries(SHADE_PRESETS).find(([, stops]) => stops[0].toLowerCase() === expose.toLowerCase() && stops[2].toLowerCase() === ombre.toLowerCase());
-    applyShade(preset ? preset[1] : [expose, ombre], preset ? preset[0] : null);
-  });
-}
 
 function calmBasemap() {
   for (const layer of map.getStyle().layers) {
@@ -294,6 +361,13 @@ let shadowCache = { key: "", data: EMPTY };
 let batisKey = "";
 
 function sunNow() {
+  if (live.on) {
+    return {
+      altitude: (live.altitude * 180) / Math.PI,
+      azimuth: (live.azimuth * 180) / Math.PI,
+      up: live.up,
+    };
+  }
   const list = season === "hiver" ? scene.winterSun : scene.sun;
   return list.find((item) => item.hour === hour) || null;
 }
@@ -376,7 +450,9 @@ function paintBuildings() {
     map.getSource("batis").setData(data);
     batisKey = key;
   }
-  const shadowKey = `${key}:${season}:${hour}`;
+  const shadowKey = live.on
+    ? `live:${live.altitude.toFixed(3)}:${live.azimuth.toFixed(3)}:${key}`
+    : `${key}:${season}:${hour}`;
   if (shadowCache.key !== shadowKey) {
     shadowCache = { key: shadowKey, data: buildShadows(data) };
     map.getSource("ombres").setData(shadowCache.data);
@@ -384,8 +460,93 @@ function paintBuildings() {
   syncVolumes();
 }
 
+let liveCity = { token: "", overview: null, far: null };
+
+function liveFraction(edge, ax, ay, bx, by) {
+  return liveShade.fraction(edge, ax, ay, bx, by, live.altitude, live.azimuth, live.up);
+}
+
+function liveCityData() {
+  const token = `${live.up ? 1 : 0}:${Math.round(live.altitude * 400)}:${Math.round(live.azimuth * 400)}`;
+  if (liveCity.token === token && liveCity.overview) return liveCity;
+  liveCity = {
+    token,
+    overview: router.liveOverview(liveFraction),
+    far: router.liveFar(liveFraction),
+  };
+  return liveCity;
+}
+
+function paintLiveStreets() {
+  const zoom = map.getZoom();
+  const overview = zoom < 12.6;
+  el.mapMode.textContent = live.up ? "Ombre des rues à cette heure" : "Soleil couché";
+  for (const id of ["gain-loin", "gain-pres"]) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", "none");
+  }
+  if (!live.up || !liveShade) {
+    if (map.getLayer("quartiers-ombre")) {
+      map.setLayoutProperty("quartiers-ombre", "visibility", "none");
+      map.setLayoutProperty("quartiers-filet", "visibility", "none");
+    }
+    map.getSource("rues-pres").setData(EMPTY);
+    map.getSource("rues-loin").setData(EMPTY);
+    map.setLayoutProperty("rues-loin", "visibility", "none");
+    paintBuildings();
+    return;
+  }
+  const ids = !overview && zoom >= 15 ? router.edgesIn(map.getBounds()) : null;
+  if (ids) {
+    if (map.getLayer("quartiers-ombre")) {
+      map.setLayoutProperty("quartiers-ombre", "visibility", "none");
+      map.setLayoutProperty("quartiers-filet", "visibility", "none");
+    }
+    map.getSource("rues-pres").setData(router.coloredEdges(ids, liveFraction));
+    map.setLayoutProperty("rues-pres", "visibility", "visible");
+    map.setLayoutProperty("rues-loin", "visibility", "none");
+    paintBuildings();
+    return;
+  }
+  const city = liveCityData();
+  if (overview) {
+    if (map.getLayer("quartiers-ombre")) {
+      map.setLayoutProperty("quartiers-ombre", "visibility", "visible");
+      map.setLayoutProperty("quartiers-filet", "visibility", "visible");
+    }
+    if (overviewKey !== city.token) {
+      map.getSource("quartiers").setData(city.overview);
+      overviewKey = city.token;
+    }
+    map.getSource("rues-pres").setData(EMPTY);
+    map.setLayoutProperty("rues-loin", "visibility", "none");
+    if (map.getPitch() > 2) paintBuildings();
+    else if (batisKey && map.getSource("batis")) {
+      map.getSource("batis").setData(EMPTY);
+      map.getSource("ombres")?.setData(EMPTY);
+      batisKey = "";
+      shadowCache = { key: "", data: EMPTY };
+    }
+    return;
+  }
+  if (map.getLayer("quartiers-ombre")) {
+    map.setLayoutProperty("quartiers-ombre", "visibility", "none");
+    map.setLayoutProperty("quartiers-filet", "visibility", "none");
+  }
+  map.getSource("rues-pres").setData(EMPTY);
+  if (farKey !== city.token) {
+    map.getSource("rues-loin").setData(city.far);
+    farKey = city.token;
+  }
+  map.setLayoutProperty("rues-loin", "visibility", "visible");
+  paintBuildings();
+}
+
 function paintStreets() {
   if (!router || !map.getSource("rues-loin")) return;
+  if (live.on) {
+    paintLiveStreets();
+    return;
+  }
   const index = scene.hours.indexOf(hour);
   const zoom = map.getZoom();
   const overview = zoom < 12.6;
@@ -450,6 +611,7 @@ map.on("load", () => {
   map.addSource("manques", { type: "geojson", data: EMPTY });
   map.addSource("projets", { type: "geojson", data: EMPTY });
   map.addSource("stations", { type: "geojson", data: EMPTY });
+  map.addSource("velib", { type: "geojson", data: EMPTY });
   registerMapIcons(map);
 
   const beforeLabels = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
@@ -586,6 +748,18 @@ map.on("load", () => {
     });
   }
   add({
+    id: "velib-points",
+    type: "symbol",
+    source: "velib",
+    minzoom: 13,
+    layout: {
+      "icon-image": "picto-velo",
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.72, 16, 1.05],
+      "icon-allow-overlap": false,
+      "icon-padding": 2,
+    },
+  });
+  add({
     id: "stations-points",
     type: "symbol",
     source: "stations",
@@ -613,7 +787,7 @@ map.on("load", () => {
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
       "line-width": 6,
-      "line-color": "#2568c8",
+      "line-color": getComputedStyle(document.documentElement).getPropertyValue("--trajet").trim() || "#7a2be2",
     },
   });
 
@@ -647,6 +821,7 @@ map.on("load", () => {
     get("data/gaps.json", "json"),
     get("data/projects.json", "json"),
     get("data/stations.json", "json"),
+    get("data/velib.json", "json"),
     (async () => {
       const parts = await Promise.all(Array.from({ length: 12 }, (_, i) => get(`data/park-part-${String(i).padStart(2, "0")}.json`, "json")));
       return {
@@ -656,16 +831,18 @@ map.on("load", () => {
       };
     })(),
   ])
-    .then(([axes, treeCover, batis, places, gaps, projects, stationRows, parkShapes]) => {
+    .then(([axes, treeCover, batis, places, gaps, projects, stationRows, velib, parkShapes]) => {
       router = createRouter(axes, (lon, lat) => pointInRing(lon, lat, scene.ring), treeCover);
       buildings = indexBuildings(batis);
+      liveShade = createLiveShade(buildings);
       amenities = places;
       stationCollection = stationRows;
-      placeVolumes.setData(places, stationRows);
+      placeVolumes.setData(places, stationRows, velib);
       placeVolumes.setShapes(parkShapes);
       map.getSource("equipements").setData(places);
       map.getSource("manques").setData(gaps);
       map.getSource("projets").setData(projects);
+      map.getSource("velib").setData(velib);
       paintStreets();
       syncView();
       note("Touchez la carte.");
@@ -691,7 +868,8 @@ window.addEventListener("resize", () => {
 
 function borne(letter) {
   const node = document.createElement("div");
-  node.className = `borne borne-${letter.toLowerCase()}`;
+  node.className = "borne";
+  node.textContent = letter;
   node.setAttribute("aria-label", letter === "A" ? "Départ" : "Arrivée");
   return new maplibregl.Marker({ element: node, anchor: "center" });
 }
@@ -726,20 +904,24 @@ function iconNode(markup) {
   return holder.firstElementChild;
 }
 
-function statCard(markup, value, unit) {
+function statCard(markup, value, unit, featured) {
   const card = document.createElement("div");
-  card.className = "stat";
+  card.className = featured ? "stat stat-temps" : "stat";
   const strong = document.createElement("strong");
   strong.textContent = value;
   const label = document.createElement("span");
   label.textContent = unit;
-  card.append(iconNode(markup), strong, label);
+  const row = document.createElement("span");
+  row.className = "stat-chiffre";
+  row.append(strong, label);
+  card.append(iconNode(markup), row);
   return card;
 }
 
 function note(text) {
   el.resultat.className = "trajet-resultat";
   el.resultat.textContent = text;
+  el.bikeTime.hidden = true;
 }
 
 function routeMeetings(segments) {
@@ -770,6 +952,10 @@ function routeMeetings(segments) {
     el.contexte.removeAttribute("aria-label");
     return "";
   }
+  const lead = document.createElement("span");
+  lead.className = "passe";
+  lead.textContent = "On passe par";
+  el.contexte.append(lead);
   const add = (count, markup) => {
     const n = document.createElement("span");
     n.textContent = String(count);
@@ -790,7 +976,9 @@ function routeMeetings(segments) {
 function stationProfile(feature) {
   const p = feature.properties;
   const index = scene.hours.indexOf(hour);
-  const shade = season === "hiver" ? p.shadeWinter[index] : view === "future" ? p.shadeFuture[index] : p.shadeToday[index];
+  const shade = live.on
+    ? null
+    : season === "hiver" ? p.shadeWinter[index] : view === "future" ? p.shadeFuture[index] : p.shadeToday[index];
   const shadeGap = shade != null && shade < 40;
   const waterGap = p.waterMeters > 350;
   const coolGap = p.coolMeters > 300;
@@ -803,6 +991,7 @@ function modeLabel(mode) {
 }
 
 function stationText(profile) {
+  if (live.on) return "";
   if (profile.shade == null) return "Soleil couché.";
   return season === "hiver"
     ? `${Math.round(100 - profile.shade)} % de soleil autour.`
@@ -818,7 +1007,9 @@ function renderStationList(profiles) {
   const visible = query || showAllStations ? matching : matching.slice(0, 10);
   el.stationCount.textContent = query
     ? `${matching.length} station${matching.length > 1 ? "s" : ""} trouvée${matching.length > 1 ? "s" : ""}.`
-    : `${visible.length} sur ${matching.length}, à ${hour} h.`;
+    : live.on
+      ? `${visible.length} sur ${matching.length}.`
+      : `${visible.length} sur ${matching.length}, à ${hour} h.`;
   el.stationList.replaceChildren();
   for (const profile of visible) {
     const p = profile.feature.properties;
@@ -828,7 +1019,7 @@ function renderStationList(profiles) {
     const name = document.createElement("strong");
     name.textContent = p.name;
     const details = document.createElement("span");
-    details.textContent = `${modeLabel(p.mode)}. ${stationText(profile)}`;
+    details.textContent = stationText(profile) ? `${modeLabel(p.mode)}. ${stationText(profile)}` : modeLabel(p.mode);
     button.append(name, details);
     button.addEventListener("click", () => {
       const coords = profile.feature.geometry.coordinates;
@@ -847,9 +1038,11 @@ function renderStations() {
   const lowShade = profiles.filter((p) => p.shade != null && p.shade < 40).length;
   const count = profiles.length;
   const day = profiles.some((p) => p.shade != null);
-  el.insights.textContent = day
-    ? `${lowShade} stations sur ${count} ont moins de 40 % d’ombre à ${hour} h.`
-    : "Soleil couché.";
+  el.insights.textContent = live.on
+    ? ""
+    : day
+      ? `${lowShade} stations sur ${count} ont moins de 40 % d’ombre à ${hour} h.`
+      : "Soleil couché.";
   renderStationList(profiles);
   if (map.getSource("stations")) {
     map.getSource("stations").setData({
@@ -874,14 +1067,24 @@ function renderStations() {
 el.stationSearch.addEventListener("input", () => renderStationList(stationCollection.features.map(stationProfile)));
 el.stationAll.addEventListener("click", () => { showAllStations = true; renderStationList(stationCollection.features.map(stationProfile)); });
 
+function routePlan(lonA, latA, lonB, latB) {
+  const hourIndex = scene.hours.indexOf(hour);
+  if (live.on && liveShade) {
+    return router.plan(lonA, latA, lonB, latB, season, hourIndex, false, {
+      up: live.up,
+      fraction: liveFraction,
+    }, accept);
+  }
+  return router.plan(lonA, latA, lonB, latB, season, hourIndex, view === "future", null, accept);
+}
+
 function drawRoute(speak) {
   if (!pointA || !pointB || !router || !map.getSource("trajet")) return;
-  const hourIndex = scene.hours.indexOf(hour);
-  let result = router.plan(pointA[0], pointA[1], pointB[0], pointB[1], season, hourIndex, view === "future");
+  let result = routePlan(pointA[0], pointA[1], pointB[0], pointB[1]);
   if (result.ok && selectedStop) {
     const [lon, lat] = selectedStop.geometry.coordinates;
-    const first = router.plan(pointA[0], pointA[1], lon, lat, season, hourIndex, view === "future");
-    const second = router.plan(lon, lat, pointB[0], pointB[1], season, hourIndex, view === "future");
+    const first = routePlan(pointA[0], pointA[1], lon, lat);
+    const second = routePlan(lon, lat, pointB[0], pointB[1]);
     if (first.ok && second.ok) {
       const length = first.length + second.length;
       result = {
@@ -917,21 +1120,30 @@ function drawRoute(speak) {
       })),
   });
   const meters = Math.round(result.length);
-  const minutes = Math.max(1, Math.round(result.length / 75));
-  const sunShare = result.neutral ? null : season === "hiver" ? 1 - result.shade : result.shade;
-  const shareLabel = result.neutral
-    ? "Soleil couché"
-    : season === "hiver"
+  const minutes = Math.max(1, Math.round(result.length / WALK_M_PER_MIN));
+  const wantSun = accept > 50;
+  const sunShare = result.neutral || result.shade == null ? null : wantSun ? 1 - result.shade : result.shade;
+  const shareLabel = sunShare == null
+    ? (result.neutral ? "Soleil couché" : "Part d’ombre inconnue")
+    : wantSun
       ? `${pct(sunShare)} au soleil`
       : `${pct(sunShare)} à l’ombre`;
   el.resultat.className = "trajet-cartes";
   el.resultat.replaceChildren(
-    statCard(ICON_TEMPS, String(minutes), "min"),
+    statCard(ICON_TEMPS, String(minutes), "min", true),
     statCard(ICON_MARCHE, meters.toLocaleString("fr-FR"), "m"),
-    statCard(season === "hiver" ? ICON_SOLEIL : ICON_OMBRE, result.neutral ? "—" : String(Math.round(sunShare * 100)), result.neutral ? "" : "%"),
+    statCard(wantSun ? ICON_SOLEIL : ICON_OMBRE, sunShare == null ? "—" : String(Math.round(sunShare * 100)), sunShare == null ? "" : "%"),
   );
+  if (allure === "velo") {
+    const bikeMinutes = Math.max(1, Math.round(result.length / (BIKE_KMH * 1000 / 60)));
+    el.bikeTime.hidden = false;
+    el.bikeTime.textContent = `${bikeMinutes} min à vélo, ${BIKE_KMH} km/h`;
+  } else {
+    el.bikeTime.hidden = true;
+    el.bikeTime.textContent = "";
+  }
   const meetings = routeMeetings(result.segments);
-  if (speak) el.direct.textContent = `${minutes} minutes, ${formatLength(result.length)}. ${shareLabel}. ${meetings}`.trim();
+  el.direct.textContent = `${minutes} minutes, ${formatLength(result.length)}. ${shareLabel}. ${meetings}`.trim();
 }
 
 const streetToken = { a: 0, b: 0 };
@@ -1018,24 +1230,200 @@ function syncPlaceIcons() {
     ["lieux-frais", el.cool.checked && !volumesOn],
     ["parcs-frais", el.parks.checked && !volumesOn],
     ["stations-points", el.stations.checked && !volumesOn],
+    ["velib-points", el.velib.checked && !volumesOn],
   ]) {
     if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
   }
 }
 
+function parisNow(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return { hour, minute, label: `${hour} h ${minute}` };
+}
+
+function syncDock() {
+  const locked = live.on;
+  el.dock.classList.toggle("is-live", locked);
+  el.range.disabled = locked;
+  el.precedent.disabled = locked;
+  el.suivant.disabled = locked;
+  el.lecture.disabled = locked;
+  if (locked) {
+    const clock = parisNow();
+    live.label = clock.label;
+    el.nombre.textContent = String(clock.hour);
+    el.unite.textContent = ` h ${clock.minute}`;
+    el.range.step = "0.01";
+    const position = clock.hour + Number(clock.minute) / 60;
+    el.range.value = String(Math.min(21, Math.max(7, position)));
+    el.range.setAttribute("aria-valuetext", clock.label);
+    return;
+  }
+  el.nombre.textContent = String(hour);
+  el.unite.textContent = " h";
+  el.range.step = "1";
+  el.range.value = String(hour);
+  el.range.setAttribute("aria-valuetext", `${hour} heures`);
+}
+
+function formatTemp(value) {
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} °C`;
+}
+
+function pressMoments() {
+  el.now.setAttribute("aria-pressed", String(live.on));
+  el.ete.setAttribute("aria-pressed", String(!live.on && season === "ete"));
+  el.hiver.setAttribute("aria-pressed", String(!live.on && season === "hiver"));
+  el.today.setAttribute("aria-pressed", String(!live.on && view === "today"));
+  el.future.setAttribute("aria-pressed", String(!live.on && view === "future"));
+}
+
+function currentSun() {
+  const now = new Date();
+  const position = sunPosition(now, LIVE_LAT, LIVE_LON);
+  live.altitude = position.altitude;
+  live.azimuth = position.azimuth;
+  live.up = position.altitude > (0.5 * Math.PI) / 180;
+  live.label = parisNow(now).label;
+  if (!live.up) live.mode = "neutral";
+  else if (live.altitude < HIGH_ALT) live.mode = "sun";
+  else if (live.weather === "ok" && live.cover < 50) live.mode = "shade";
+  else live.mode = "neutral";
+}
+
+function sunSentence() {
+  if (live.on && !live.up) return "Soleil couché.";
+  if (accept <= 0) return "Le trajet évite le soleil.";
+  if (accept >= 100) return "Le trajet cherche le soleil.";
+  return "Un détour seulement s’il vaut le temps.";
+}
+
+function renderCopy() {
+  syncDock();
+  pressMoments();
+  const seek = accept > 50;
+  el.goalIcon.replaceChildren(iconNode((live.on && !live.up) || seek ? ICON_SOLEIL : ICON_OMBRE));
+  el.goalText.textContent = sunSentence();
+  el.goalExtra.classList.toggle("ligne-meteo", live.on);
+  if (live.on) {
+    if (live.weather === "ok") {
+      const sky = live.cover >= 50 ? "couvert" : "dégagé";
+      const line = `${live.label}, ${formatTemp(live.temp)}, ${sky}`;
+      el.goalExtra.textContent = live.cover >= 50
+        ? `${line}. Le ciel couvert compte plus que l’ombre des murs.`
+        : line;
+    } else if (live.weather === "miss") {
+      el.goalExtra.textContent = `${live.label}. La météo manque.`;
+    } else {
+      el.goalExtra.textContent = live.label;
+    }
+  } else {
+    el.goalExtra.textContent = view === "today"
+      ? ""
+      : season === "hiver"
+        ? "L’ombre reste celle des bâtiments."
+        : "Les jeunes arbres sont plus grands.";
+  }
+  refreshGradient();
+}
+
+function leaveLive() {
+  if (!live.on) return false;
+  live.on = false;
+  farKey = "";
+  overviewKey = "";
+  shadowCache = { key: "", data: EMPTY };
+  batisKey = "";
+  stopLiveTimer();
+  syncDock();
+  return true;
+}
+
+function enterLive() {
+  if (!router || !buildings || !liveShade) {
+    note("Chargement de Paris…");
+    return;
+  }
+  stopPlay();
+  live.on = true;
+  live.weather = live.weather === "ok" ? "ok" : "wait";
+  currentSun();
+  farKey = "";
+  overviewKey = "";
+  shadowCache = { key: "", data: EMPTY };
+  batisKey = "";
+  syncView();
+  loadWeather();
+  startLiveTimer();
+}
+
+let liveTimer = 0;
+
+function stopLiveTimer() {
+  if (liveTimer) window.clearInterval(liveTimer);
+  liveTimer = 0;
+}
+
+function startLiveTimer() {
+  stopLiveTimer();
+  liveTimer = window.setInterval(() => {
+    tickLive();
+  }, 60_000);
+}
+
+function tickLive() {
+  if (!live.on) {
+    stopLiveTimer();
+    return;
+  }
+  currentSun();
+  renderCopy();
+  paintStreets();
+  loadWeather();
+}
+
+async function loadWeather() {
+  const token = ++weatherToken;
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  url.searchParams.set("latitude", String(LIVE_LAT));
+  url.searchParams.set("longitude", String(LIVE_LON));
+  url.searchParams.set("current", "cloud_cover,temperature_2m,is_day");
+  url.searchParams.set("timezone", "Europe/Paris");
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!response.ok) throw new Error(String(response.status));
+    const data = await response.json();
+    const current = data.current || {};
+    if (!Number.isFinite(current.cloud_cover) || !Number.isFinite(current.temperature_2m)) throw new Error("champs");
+    if (token !== weatherToken || !live.on) return;
+    live.cover = current.cloud_cover;
+    live.temp = current.temperature_2m;
+    live.weather = "ok";
+  } catch {
+    if (token !== weatherToken || !live.on) return;
+    if (live.weather !== "ok") {
+      live.cover = null;
+      live.temp = null;
+      live.weather = "miss";
+    }
+  }
+  const previous = live.mode;
+  currentSun();
+  renderCopy();
+  if ((live.mode !== previous) && pointA && pointB) drawRoute(false);
+}
+
 function syncView() {
-  el.today.setAttribute("aria-pressed", String(view === "today"));
-  el.future.setAttribute("aria-pressed", String(view === "future"));
-  const winter = season === "hiver";
-  el.goalIcon.replaceChildren(iconNode(winter ? ICON_SOLEIL : ICON_OMBRE));
-  el.goalText.textContent = winter ? "Le trajet cherche le soleil." : "Le trajet cherche l’ombre.";
-  el.goalExtra.textContent = view === "today"
-    ? ""
-    : winter
-      ? "L’ombre reste celle des bâtiments."
-      : "Les jeunes arbres sont plus grands.";
+  renderCopy();
   for (const [id, visible] of [
-    ["legende-gain", view === "future" && season === "ete"],
+    ["legende-gain", view === "future" && season === "ete" && !live.on],
     ["legende-manque", view === "future"],
     ["legende-projet", view === "future"],
     ["legende-alerte", el.stations.checked],
@@ -1057,6 +1445,7 @@ function syncView() {
     cool: el.cool.checked,
     park: el.parks.checked,
     station: el.stations.checked,
+    velib: el.velib.checked,
   });
   if (pointA && pointB) drawRoute(false);
 }
@@ -1126,6 +1515,21 @@ function showStationPopup(feature, lngLat, suppliedProfile) {
 }
 
 function popup(feature, lngLat) {
+  if (feature.properties?.category === "velib") {
+    const places = Number.isFinite(Number(feature.properties.capacity))
+      ? `${feature.properties.capacity} emplacements`
+      : "";
+    openFiche(lngLat, feature.properties.name, "Vélib", places, allure === "velo" && pointA && pointB
+      ? {
+          label: "Étape",
+          run() {
+            selectedStop = feature;
+            drawRoute(true);
+          },
+        }
+      : null);
+    return;
+  }
   if (feature.properties.category === "station") {
     showStationPopup(feature, feature.geometry.coordinates);
     return;
@@ -1166,7 +1570,7 @@ function popup(feature, lngLat) {
 }
 
 function onMapClick(event) {
-  const ids = ["stations-points", "points-eau", "lieux-frais", "parcs-frais", "manques", "projets"].filter((id) => map.getLayer(id));
+  const ids = ["velib-points", "stations-points", "points-eau", "lieux-frais", "parcs-frais", "manques", "projets"].filter((id) => map.getLayer(id));
   const feature = map.queryRenderedFeatures(event.point, { layers: ids })[0];
   if (feature) {
     popup(feature, event.lngLat);
@@ -1237,14 +1641,38 @@ for (const letter of ["a", "b"]) {
 }
 el.vueDessus.addEventListener("click", () => aimView(false));
 el.vueInclinee.addEventListener("click", () => aimView(true));
-el.today.addEventListener("click", () => { view = "today"; syncView(); });
-el.future.addEventListener("click", () => { view = "future"; syncView(); });
-for (const input of [el.water, el.cool, el.parks, el.stations]) input.addEventListener("change", syncView);
+el.today.addEventListener("click", () => { leaveLive(); view = "today"; syncView(); });
+el.future.addEventListener("click", () => { leaveLive(); view = "future"; syncView(); });
+el.now.addEventListener("click", () => enterLive());
+for (const input of [el.water, el.cool, el.parks, el.stations, el.velib]) input.addEventListener("change", syncView);
+function setAllure(next) {
+  allure = next;
+  el.pied.setAttribute("aria-pressed", String(next === "pied"));
+  el.velo.setAttribute("aria-pressed", String(next === "velo"));
+  if (next === "pied" && selectedStop?.properties?.category === "velib") selectedStop = null;
+  if (pointA && pointB) drawRoute(false);
+  else {
+    el.bikeTime.hidden = true;
+    el.bikeTime.textContent = "";
+  }
+}
+
+el.pied.addEventListener("click", () => setAllure("pied"));
+el.velo.addEventListener("click", () => setAllure("velo"));
+for (const button of document.querySelectorAll("#soleil-crans button")) {
+  button.addEventListener("click", () => {
+    accept = Number(button.dataset.accept);
+    for (const other of document.querySelectorAll("#soleil-crans button")) {
+      other.setAttribute("aria-pressed", String(other === button));
+    }
+    renderCopy();
+    if (pointA && pointB) drawRoute(false);
+  });
+}
 
 function setSeason(next) {
+  leaveLive();
   season = next;
-  el.ete.setAttribute("aria-pressed", String(season === "ete"));
-  el.hiver.setAttribute("aria-pressed", String(season === "hiver"));
   renderHour(hour, Boolean(pointA && pointB));
   syncView();
 }
@@ -1294,7 +1722,9 @@ if (params.has("test")) {
     },
     place: (lon, lat, which) => place([lon, lat], which),
     season: setSeason,
-    hour: (h) => renderHour(h, false),
+    hour: (h) => { leaveLive(); renderHour(h, false); },
+    now: () => enterLive(),
+    live: () => ({ ...live, hour, season, view, slider: Number(el.range.value) }),
     shade: () => shadeStops.slice(),
     preset: () => activePreset,
     volumes: () => placeVolumes.count(),
@@ -1338,6 +1768,7 @@ el.corps.innerHTML = `
     <li>Ville de Paris : Les arbres, hauteurs, stades de développement et emplacements. ODbL. Relevé lors de la génération du prototype.</li>
     <li>Île-de-France Mobilités : Lignes de transport en projet en Île-de-France. Dates estimées et statuts fournis par le jeu. Licence Ouverte.</li>
     <li>Île-de-France Mobilités : Gares et stations du réseau ferré d’Île-de-France (donnée généralisée). Points représentatifs, licence Ouverte v2.</li>
+    <li>Vélib’ Métropole, via Open Data Paris : emplacement des stations. Nom, code et nombre d’emplacements. ODbL. Pas de disponibilité en temps réel.</li>
     <li>Base Adresse Nationale / IGN : service de géocodage Géoplateforme.</li>
     <li>${scene.temperature.source} À Luxembourg, ${scene.temperature.byHour[16] ?? "—"} °C à 16 h. À Montsouris, ${scene.montsouris.byHour[16] ?? "—"} °C à la même heure.</li>
     <li>Fond : OpenFreeMap, données OpenStreetMap. ODbL.</li>
