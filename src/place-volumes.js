@@ -82,6 +82,10 @@ function buildModels() {
   prism(fountain, 0, 0, 0.7, 1.35, 1.7, 8, rgb("#b7e4f5"));
   prism(fountain, 0, 0, 1.15, 3.1, 0.28, 6, rgb("#f4f7f8"));
 
+  const velib = [];
+  prism(velib, 0, 0, 0.12, 1.35, 1.7, 6, rgb("#0b6e4f"));
+  prism(velib, 0, 0, 1.35, 1.62, 2.05, 6, rgb("#d7f3ea"));
+
   const metro = [];
   box(metro, 0, 0, 0.05, 4.2, 2.2, 0.18, rgb("#214c83"));
   box(metro, -1.7, -0.7, 0.2, 0.18, 0.18, 2.15, rgb("#d5dbe3"));
@@ -126,6 +130,7 @@ function buildModels() {
 
   return {
     fountain: Float32Array.from(fountain),
+    velib: Float32Array.from(velib),
     metro: Float32Array.from(metro),
     bus: Float32Array.from(bus),
     gare: Float32Array.from(gare),
@@ -181,7 +186,7 @@ void main() {
 
 export const VOLUME_ZOOM = 13;
 
-const DRAW_ORDER = ["lawn", "path", "tree", "fountain", "cool", "bus", "metro", "gare"];
+const DRAW_ORDER = ["lawn", "path", "tree", "fountain", "velib", "cool", "bus", "metro", "gare"];
 
 function localMatrix(lng, lat, yaw, scale, scaleZ) {
   const origin = maplibregl.MercatorCoordinate.fromLngLat([lng, lat], 0);
@@ -403,7 +408,8 @@ export function createPlaceVolumes(map) {
   const models = buildModels();
   let amenities = null;
   let stations = null;
-  let show = { water: true, cool: true, park: true, station: true };
+  let velib = null;
+  let show = { water: true, cool: true, park: true, station: true, velib: true };
   let key = "";
   let count = 0;
   let generation = 0;
@@ -471,7 +477,7 @@ export function createPlaceVolumes(map) {
         }
         gl.vertexAttrib4f(2, 1, 0, 0, 0);
         gl.vertexAttrib4f(3, 0, 1, 0, 0);
-        gl.vertexAttrib4f(4, 0, 0, 1, 0);
+        gl.vertexAttrib4f(4, 0, 0, 1. 0);
         gl.vertexAttrib4f(5, 0, 0, 0, 1);
         gl.uniform1f(this.grain, 0.16);
         gl.drawArrays(gl.TRIANGLES, 0, groundCount);
@@ -605,6 +611,14 @@ export function createPlaceVolumes(map) {
         }
       }
     }
+    if (show.velib && velib) {
+      for (const feature of velib.features || []) {
+        const [lon, lat] = feature.geometry.coordinates;
+        if (!hits(lon, lat, 0, box)) continue;
+        push("velib", lon, lat, (hash(feature.properties.code || feature.properties.name || "") % 6) / 6 * TAU, 1.35 * read);
+        count++;
+      }
+    }
     if (show.station && stations) {
       for (const feature of stations.features || []) {
         const [lon, lat] = feature.geometry.coordinates;
@@ -635,7 +649,9 @@ export function createPlaceVolumes(map) {
       show.cool ? 1 : 0,
       show.park ? 1 : 0,
       show.station ? 1 : 0,
+      show.velib ? 1 : 0,
       amenities ? amenities.features.length : 0,
+      velib ? velib.features.length : 0,
     ].join(":");
     if (next === key) return count;
     key = next;
@@ -647,9 +663,10 @@ export function createPlaceVolumes(map) {
   return {
     layer,
     count: () => count,
-    setData(places, stationRows) {
+    setData(places, stationRows, velibRows) {
       amenities = places;
       stations = stationRows;
+      velib = velibRows || null;
       key = "";
       sync();
     },
