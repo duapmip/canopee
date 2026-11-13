@@ -1,7 +1,7 @@
 # Canopée — Mobilités douces, ville plus chaude
 
 - **Équipe** — Maxime Pimpaud et Adrien Bourdin
-- **Mail de contact** — À renseigner avec l’adresse choisie par l’équipe pour le dépôt public
+- **Mails de contact** — max.pimpaud@gmail.com, ad.bourdin@pm.me
 - **Défi 1** — Les mobilités et l’adaptation climatique
 
 ## Notre question
