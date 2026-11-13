@@ -569,12 +569,49 @@ export function indexBuildings(buffer) {
     return { coords, at };
   }
 
-  function featuresIn(west, south, east, north) {
+  function simplifyClosed(coords, maxPts) {
+    const n = coords.length - 1;
+    if (n <= maxPts) return coords;
+    const step = Math.ceil(n / maxPts);
+    const out = [];
+    for (let i = 0; i < n; i += step) out.push(coords[i]);
+    out.push(out[0]);
+    return out;
+  }
+
+  function exteriorRing(i) {
+    let at = offset[i] + 2;
+    if (view.getUint8(at++) < 1) return null;
+    if (view.getUint8(at++) < 1) return null;
+    const nPts = view.getUint16(at, true);
+    at += 2;
+    return simplifyClosed(readRing(at, nPts).coords, 6);
+  }
+
+  let mesh = null;
+  function cityMesh() {
+    if (mesh) return mesh;
+    const features = [];
+    for (let i = 0; i < count; i++) {
+      const ring = exteriorRing(i);
+      if (!ring || ring.length < 4) continue;
+      const known = hdm[i] > 0;
+      features.push({
+        type: "Feature",
+        properties: { known: known ? 1 : 0, h: known ? hdm[i] / 10 : 0 },
+        geometry: { type: "Polygon", coordinates: [ring] },
+      });
+    }
+    mesh = { type: "FeatureCollection", features };
+    return mesh;
+  }
+
+  function featuresIn(west, south, east, north, limit = 3500) {
     const features = [];
     for (let i = 0; i < count; i++) {
       if (maxLon[i] < west || minLon[i] > east || maxLat[i] < south || minLat[i] > north) continue;
       features.push(i);
-      if (features.length > 3500) return null;
+      if (features.length > limit) return null;
     }
     const out = [];
     for (const i of features) {
@@ -606,5 +643,5 @@ export function indexBuildings(buffer) {
     return { type: "FeatureCollection", features: out };
   }
 
-  return { count, featuresIn };
+  return { count, featuresIn, cityMesh };
 }
