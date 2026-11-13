@@ -33,8 +33,10 @@
 .hero-copy .text-link { font-size: 15px; margin-top: 28px; border: 0; }
 .chapter-nav { background: rgba(245,245,243,.96); }
 .chapter-nav a.active { color: var(--ink); }
-.section-intro { max-width: 800px; }
-.section-intro h2 { margin-bottom: 20px; }
+.section-intro { max-width: none; }
+.section-intro h2 { margin-bottom: 20px; font-size: clamp(32px, 3.5vw, 48px); }
+.section-intro > p:last-child { max-width: 860px; }
+.section-takeaway { font-size: 18px; color: var(--muted); margin-top: 16px; max-width: 780px; }
 .climate-lead .giant, .big-number, .future-headline strong:first-child, .route-benefit-number { color: var(--ink); }
 .climate-lead .giant { font-size: 112px; }
 .climate-lead p { font-size: 20px; }
@@ -48,7 +50,8 @@
 .climate-row .climate-bar, .climate-row.reference .climate-bar { position: absolute; top: 7px; width: 18px; height: 18px; border-radius: 50%; background: var(--shade); transform: translateX(-50%); z-index: 1; box-shadow: 0 0 0 3px var(--paper); }
 .climate-value { font-size: 24px; }
 .climate-axis { margin: 0 104px 0 108px; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
-.water-layout { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: start; }
+.water-layout { display: grid; grid-template-columns: 1fr; gap: 32px; align-items: start; }
+.water-layout > figure { width: min(100%, 800px); }
 .water-layout .section-intro { margin: 0; }
 .water-layout .section-intro .small { margin-top: 20px; font-size: 14px; }
 .water-layout #water-count { font-weight: 600; color: var(--ink); }
@@ -78,14 +81,15 @@
 .site-footer .brand-logo { width: 144px; }
 .tool-finale { background: #e9eceb; padding: 64px 0; }
 .tool-finale-layout { display: grid; grid-template-columns: .9fr 1.2fr; gap: 48px; align-items: center; }
+.tool-finale-layout > h2 { grid-column: 1 / -1; font-size: clamp(32px,3.5vw,48px); }
+.tool-finale-layout > div > p { margin-top: 0; }
 .tool-finale h2 { font-size: clamp(36px,4vw,56px); line-height: 1.08; font-weight: 600; letter-spacing: -1.5px; }
 .tool-finale p { max-width: 440px; color: var(--muted); margin-top: 24px; font-size: 19px; }
 .tool-finale .primary-cta { margin-top: 28px; padding: 18px 24px; font-size: 20px; }
 .tool-preview { position: relative; height: 440px; border-radius: 24px; overflow: hidden; background: #f2f2f2; }
 #tool-preview-map { position: absolute; inset: 0; }
 .preview-caption { position: absolute; left: 16px; top: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; font-size: 14px; }
-.preview-caption > span, .preview-pause { background: rgba(255,255,255,.94); border-radius: 8px; padding: 10px 12px; }
-.preview-pause { position: absolute; bottom: 16px; right: 16px; cursor: pointer; font-size: 13px; }
+.preview-caption > span { background: rgba(255,255,255,.94); border-radius: 8px; padding: 10px 12px; }
 .preview-caption .metro-stop { color: white; background: var(--metro-blue); }
 .preview-status { position: absolute; left: 20px; bottom: 18px; color: var(--muted); font-size: 12px; max-width: 50%; }
 @media(max-width: 1000px) {
@@ -112,7 +116,6 @@
 }
 @media(max-width: 500px) {
   .site-header .brand-logo { width: 136px; }
-  .site-header nav > a:first-child { display: none; }
   .nav-tool { font-size: 14px; padding: 10px 12px; }
   .nav-tool span { margin-left: 4px; }
   .hero h1 { font-size: 44px; letter-spacing: -1.5px; }
@@ -134,5 +137,23 @@
 .tool-preview { text-align: left; }
 
 .route-controls { --route: var(--ink); }
-.station-picker-shortcut[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--shade); }
+.station-picker-sign { display: grid; grid-template-columns: 32px minmax(0,1fr) 32px; align-items: center; width: 100%; height: 56px; padding: 0 8px; border-radius: 6px; color: white; background: var(--metro-blue); }
+.station-picker-sign .station-picker-input { grid-column: 2; width: 100%; min-width: 0; min-height: 44px; padding: 8px 0; border: 0; border-radius: 0; background: transparent; color: white; font-size: 23px; font-weight: 600; line-height: 1.2; text-align: center; text-overflow: ellipsis; cursor: pointer; }
+.station-picker-sign .station-picker-input:focus { outline: none; background: transparent; cursor: text; }
+.station-picker-sign .station-picker-input::placeholder { color: rgba(255,255,255,.8); font-size: 16px; font-weight: 400; }
+.station-picker-sign .station-picker-input::-webkit-search-cancel-button { display: none; }
+.station-picker-toggle { grid-column: 3; display: grid; place-items: center; width: 32px; height: 44px; padding: 0; color: inherit; background: transparent; cursor: pointer; }
+.station-picker-chevron { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform 180ms ease; }
+.station-picker-sign:hover { background: var(--metro-hover); }
+.station-picker-sign.is-open { border-radius: 6px 6px 0 0; }
+.station-picker-sign.is-open { grid-template-columns: minmax(0,1fr) 32px; padding-left: 16px; }
+.station-picker-sign.is-open .station-picker-input { grid-column: 1; text-align: left; font-size: 18px; font-weight: 400; }
+.station-picker-sign.is-open .station-picker-toggle { grid-column: 2; }
+.station-picker-sign.is-open .station-picker-chevron { transform: rotate(225deg); }
+.station-picker-panel { position: absolute; z-index: 5; top: 100%; left: 0; right: 0; padding: 12px; border: 1px solid #d9dcd9; border-top: 0; border-radius: 0 0 8px 8px; background: white; box-shadow: 0 12px 24px rgba(8,21,38,.1); }
+.station-picker-panel[hidden] { display: none; }
+.station-picker-panel .station-picker-results { position: relative; top: auto; margin: 0; padding: 0; border: 0; box-shadow: none; }
+.station-picker-panel .station-picker-option { min-height: 44px; padding: 10px 8px; }
+.station-picker-toggle:focus, .station-picker-toggle:focus-visible { outline: none; box-shadow: none; }
+.station-picker-sign:has(:focus-visible) { outline: 2px solid var(--shade); outline-offset: 3px; }
 #profile { cursor: crosshair; touch-action: pan-y; }

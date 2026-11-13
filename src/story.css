@@ -1726,9 +1726,6 @@ a:hover {
   }
 }
 @media (max-width: 380px) {
-  .site-header nav > a:first-child {
-    display: none;
-  }
   .hero h1 {
     font-size: 52px;
   }

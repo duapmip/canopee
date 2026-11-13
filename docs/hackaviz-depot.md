@@ -19,7 +19,7 @@ La [carte Canopée](https://canopee-delta.vercel.app/) permet d’explorer l’o
 | Source | Jeu de données et usage | Lien |
 | --- | --- | --- |
 | Île-de-France Mobilités | Gares et stations du réseau ferré, positions généralisées | [Catalogue IDFM](https://data.iledefrance-mobilites.fr/explore/dataset/emplacement-des-gares-idf-data-generalisee/) |
-| Île-de-France Mobilités | Validations ferroviaires 2025. Agrégats de Projet_equipe_3, rapprochés des stations de Canopée. | [Source PRIM](https://prim.iledefrance-mobilites.fr/jeux-de-donnees/histo-validations-reseau-ferre), [publication de l’équipe 3](https://github.com/hackathons-mobilites/hackaviz_2026/pull/6) |
+| Île-de-France Mobilités | Validations ferroviaires 2025, agrégées à partir des quatre fichiers trimestriels officiels et rapprochées par identifiant ID_ZdC | [Source PRIM](https://prim.iledefrance-mobilites.fr/jeux-de-donnees/histo-validations-reseau-ferre) |
 | Île-de-France Mobilités | Lignes de transport en projet | [Catalogue IDFM](https://data.iledefrance-mobilites.fr/explore/dataset/projets_lignes_idf/) |
 | IGN | BD TOPO. Axes de rues, emprises et hauteurs de bâtiments. | [BD TOPO](https://geoservices.ign.fr/bdtopo) |
 | API Géo et IGN | Contour de Paris et recherche d’adresses | [API Géo](https://geo.api.gouv.fr/communes/75056?fields=contour&format=geojson&geometry=contour), [Géocodage](https://adresse.data.gouv.fr/outils/api-doc/adresse) |
@@ -29,7 +29,7 @@ La [carte Canopée](https://canopee-delta.vercel.app/) permet d’explorer l’o
 | Open-Meteo | Température et couverture nuageuse en mode Direct | [Open-Meteo](https://open-meteo.com/en/license) |
 | OpenStreetMap et OpenFreeMap | Fond de carte | [OpenStreetMap](https://www.openstreetmap.org/copyright), [OpenFreeMap](https://openfreemap.org/) |
 
-Les méthodes de calcul, les attributions et les fichiers de données du récit sont accessibles dans [Sources et méthode](https://canopee-delta.vercel.app/dataviz#sources). Les agrégats de validations sont crédités à IDFM et à l’équipe 3. Ils n’ont pas été recalculés depuis les fichiers bruts.
+Les méthodes de calcul, les attributions et les fichiers de données du récit sont accessibles dans [Sources et méthode](https://canopee-delta.vercel.app/dataviz#sources). Les validations sont comptées au niveau du pôle, tous titres confondus. Les totaux restent approximatifs en raison des petits effectifs masqués par IDFM.
 
 ## Les outils employés
 

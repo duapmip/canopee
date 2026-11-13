@@ -121,3 +121,19 @@ test("Summer routes use the available space rather than fitting invisible winter
     assert.deepEqual(reordered.forExample(id).center, summer.forExample(id).center);
   }
 });
+
+test("The seasonal viewport fits all hours without zooming or recentering", () => {
+  for (const season of ['ete','hiver']) {
+    const stable = createRouteProjections(data.examples,{season});
+    for (const example of data.examples) {
+      const {project} = stable.forExample(example.id);
+      for (const frame of example.comparisons.filter(c=>c.season===season)) {
+        for(const route of [frame.shortest,frame.preferred]) for(const point of route.path) {
+          const [x,y] = project(point);
+          assert(x >= 48-1e-8 && x <= 552+1e-8);
+          assert(y >= 32-1e-8 && y <= 348+1e-8);
+        }
+      }
+    }
+  }
+});

@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRouter, indexBuildings } from "../src/router.js";
 import { groundShadows } from "../src/story-preview-geometry.js";
+import { createRouteProjections } from "../src/story-geometry.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dir = path.join(root, "public/data");
@@ -24,7 +25,7 @@ function binary(name) {
 const scene = json("scene.json");
 const stations = json("stations.json");
 const trees = json("tree-cover.json");
-const traffic = json("hackaviz-validations-2025.json");
+const traffic = json("idfm-validations-2025.json");
 const round = (n, digits = 1) => Number(n.toFixed(digits));
 const distance = (a, b) =>
   Math.hypot((a[0] - b[0]) * 73400, (a[1] - b[1]) * 111132);
@@ -41,34 +42,18 @@ function inside(x, y) {
   }
   return ok;
 }
-const norm = (s) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/saint/g, "st")
-    .replace(/[^a-z0-9]/g, "");
-const matches = new Map();
+const trafficById = new Map(traffic.rows.map(row => [row.id, row]));
+if (trafficById.size !== traffic.rows.length) throw new Error("Duplicate traffic identifiers");
 const points = stations.features.map((f) => {
   const p = f.properties,
     coords = f.geometry.coordinates;
-  const candidates = traffic.rows
-    .map((r, i) => ({ r, i }))
-    .filter(
-      ({ r }) =>
-        norm(r.nom) === norm(p.name) && distance([r.lon, r.lat], coords) <= 350,
-    );
-  const match = candidates.length === 1 ? candidates[0] : null;
-  if (match) matches.set(match.i, (matches.get(match.i) || 0) + 1);
-  return { ...p, coords, match };
+  const match = trafficById.get(String(p.id));
+  // All four quarters are required; incomplete coverage is never annualised.
+  const complete = match?.quarters.length === 4;
+  return { ...p, coords, validations: complete ? match.freq : null,
+    validationsLower: complete ? match.lower : null, trafficId: complete ? match.id : null,
+    trafficName: complete ? match.nom : null };
 });
-// Exclude ambiguous joins in either direction. Never duplicate a traffic total.
-for (const p of points) {
-  p.validations =
-    p.match && matches.get(p.match.i) === 1 ? p.match.r.freq : null;
-  p.trafficName = p.validations != null ? p.match.r.nom : null;
-  delete p.match;
-}
 const router = createRouter(
   binary("axes.bin"),
   inside,
@@ -195,6 +180,22 @@ writeFileSync(path.join(dir, "story-preview.json"), JSON.stringify({
   buildings: previewBuildings,
   shadows: groundShadows(previewBuildings, scene.sun.find(s => s.hour === 16)),
 }));
+// Fill the whole comparison viewport with real context. A shorter route must
+// not become an isolated island of streets floating in a blank rectangle.
+const seasonMaps = Object.fromEntries(["ete", "hiver"].map(season => [season, createRouteProjections(examples, { season })]));
+for (const example of examples) {
+  const frames = Object.values(seasonMaps).map(m => m.forExample(example.id).bounds);
+  const bounds = [Math.min(...frames.map(b => b[0])), Math.min(...frames.map(b => b[1])), Math.max(...frames.map(b => b[2])), Math.max(...frames.map(b => b[3]))];
+  example.buildings = buildings.featuresIn(...bounds, 20000).features
+    .flatMap(f => f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates)
+    .map(polygon => polygon.map(ring => ring.map(p => p.map(v => round(v, 6)))));
+  for (const comparison of example.comparisons) {
+    const [west, south, east, north] = seasonMaps[comparison.season].forExample(example.id).bounds;
+    comparison.streets = roadFrames.get(comparison.season + comparison.hour)
+      .filter(f => f.geometry.coordinates.some(p => p[0] >= west && p[0] <= east && p[1] >= south && p[1] <= north))
+      .map(f => ({ path: f.geometry.coordinates.map(p => p.map(v => round(v, 6))), shade: f.properties.s }));
+  }
+}
 const out = {
   generated: new Date().toISOString().slice(0, 10),
   method: {
@@ -205,7 +206,7 @@ const out = {
     speedMetersPerMinute: 75,
     preference: 30,
     trafficJoin:
-      "Nom normalisé identique et distance ≤ 350 m ; correspondance unique dans les deux sens. Les non-correspondances restent sans donnée.",
+      "Identifiant ID_ZdC identique et présence des quatre trimestres de 2025. Les non-correspondances restent sans donnée.",
     stationAggregation:
       "Moyenne simple des parts d’ombre des stations. À chaque station, moyenne des segments proches pondérée par leur longueur.",
   },

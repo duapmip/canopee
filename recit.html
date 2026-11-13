@@ -22,8 +22,7 @@
         ><img class="brand-logo" src="./canopee-logo.webp" width="190" height="48" alt="" /></a
       >
       <nav aria-label="Navigation principale">
-        <a href="./dataviz" aria-current="page">Le récit</a
-        ><a class="nav-tool" href="./index.html"
+        <a class="nav-tool" href="./index.html"
           >Ouvrir Canopée </a
         >
       </nav>
@@ -37,7 +36,7 @@
           <p class="hero-dek">À Paris, nous croisons l’ombre des rues, l’accès à l’eau et les trajets vers les stations pour repérer les besoins d’adaptation.</p>
           <div class="atlas-fact">
             <strong id="hero-percent">—</strong>
-            <p>des secteurs sous<br /> <b>40 % d’ombre.</b><small id="atlas-fact-note"></small></p>
+            <p>des secteurs sous<br /> <b>40 % d’ombre.</b></p>
           </div>
           <a class="text-link" href="#climat"
             >Explorer les résultats </a
@@ -46,16 +45,24 @@
         <figure class="hero-atlas">
           <div class="atlas-heading">
             <strong>Paris au fil du soleil</strong>
-            <span id="atlas-context">25 juin 2026</span>
           </div>
           <div class="atlas-map-surface">
           <svg
             id="atlas"
-            viewBox="0 0 600 440"
+            viewBox="0 60 600 320"
             role="img"
             aria-label="Évolution de l’ombre des rues de Paris par hexagone au fil de la journée"
           ></svg>
           <div class="hex-legend" aria-label="Échelle de 0 à 100 pour cent d’ombre des rues"><strong>Ombre<br />des rues</strong><span>100 %</span><span class="hex-legend-ramp" aria-hidden="true"></span><span>0 %</span></div>
+          </div>
+          <div class="atlas-map-caption">
+            <svg class="atlas-compass" viewBox="0 0 64 64" role="img" aria-label="Boussole, le nord est en haut">
+              <circle cx="32" cy="36" r="20" fill="none" stroke="currentColor" stroke-opacity=".2" />
+              <path d="M32 18 39 43 32 39 25 43Z" fill="#081526" /><path d="M32 18v21l-7 4Z" fill="#82c2ee" />
+              <path d="M8 36h5m38 0h5M32 55v5" stroke="currentColor" />
+              <text x="32" y="11" text-anchor="middle" fill="currentColor" font-size="11" font-weight="600">N</text>
+            </svg>
+            <span id="atlas-context">25 juin 2026, ciel dégagé</span>
           </div>
           <div class="atlas-controls">
             <button type="button" id="atlas-play" class="play-control" aria-pressed="false" aria-label="Lire la journée de 7 h à 21 h">
@@ -93,7 +100,8 @@
       <section id="climat" class="chapter">
         <div class="wrap">
         <div class="section-intro">
-          <h2>Davantage de jours<br />très chauds à Paris</h2>
+          <h2>Paris face aux fortes chaleurs</h2>
+          <p>Les déplacements quotidiens devront composer plus souvent avec plus de 35 °C. L’ombre et l’eau deviennent des conditions concrètes pour continuer à marcher ou pédaler.</p>
         </div>
         <div class="climate-layout">
           <div class="climate-lead">
@@ -128,14 +136,11 @@
       <section id="stations" class="chapter shade-section">
         <div class="wrap">
           <div class="section-intro">
-            <h2>Accéder aux transports<br />ne garantit pas l’ombre</h2>
-            <p>
-              À 16 h, où se croisent fréquentation et rues exposées ?
-            </p>
+            <h2>Des stations inégalement ombragées</h2>
+            <p id="station-analysis">Nous croisons l’usage des stations avec l’ombre des rues alentour pour repérer les accès à protéger en priorité.</p>
           </div>
           <div class="station-layout">
             <figure class="scatter-figure">
-              <h3>Chaque point, une station</h3>
               <div class="chart-scroll">
                 <svg
                   id="scatter"
@@ -167,12 +172,15 @@
           <details class="data-details">
             <summary>Données et méthode</summary>
             <p>
-              Validations ferroviaires 2025 d’IDFM, agrégées dans le projet de
-              l’équipe 3. Rapprochement avec nos stations par nom normalisé et
-              proximité (350 m maximum), uniquement si la correspondance est
-              unique dans les deux sens. Les stations non rapprochées ne valent
-              pas zéro. Les agrégats n’ont pas été recalculés depuis les
-              fichiers bruts.
+              Somme des validations quotidiennes publiées par IDFM sur les quatre
+              trimestres de 2025, tous titres confondus. Rapprochement par identifiant
+              officiel ID_ZdC. Un identifiant peut regrouper plusieurs stations d’un
+              même pôle : les validations couvrent ce pôle, tandis que l’ombre
+              concerne son point représentatif. Les valeurs absentes restent absentes. Les petits
+              effectifs masqués sont conservés à leur borne publiée : les totaux
+              sont approximatifs. Une validation n’est ni une personne unique
+              ni une mesure du nombre de piétons exposés. L’ombre concerne les
+              rues à 250 m de chaque station, le 25 juin 2026 à 16 h.
             </p>
             <div class="table-scroll">
               <table>
@@ -197,8 +205,9 @@
       <section id="eau" class="chapter">
         <div class="wrap water-layout">
           <div class="section-intro">
-            <h2>S’hydrater demande<br />parfois un détour</h2>
+            <h2>L’eau reste parfois à distance</h2>
             <p><strong id="water-count">—</strong> stations sont à plus de 250 m d’une fontaine recensée.</p>
+            <p class="section-takeaway">Un réseau dense de transports ne suffit donc pas à assurer un accès proche à l’eau. Ces écarts permettent de cibler les parcours à mieux équiper.</p>
             <p class="small">Distances à vol d’oiseau depuis les points des stations, pas des distances de marche. Ouverture et fonctionnement non vérifiés.</p>
           </div>
           <figure>
@@ -212,9 +221,9 @@
       <section id="saisons" class="chapter">
         <div class="wrap">
         <div class="section-intro">
-          <h2>Le confort change<br />avec l’heure et la saison</h2>
+          <h2>À chaque saison, son chemin</h2>
           <p>
-            En hiver, le soleil plus bas allonge les ombres.
+            Un trajet agréable varie avec l’heure : l’été, on cherche l’ombre ; l’hiver, un soleil plus bas laisse moins de rues éclairées. Le meilleur chemin n’est donc pas toujours le même.
           </p>
         </div>
         <div class="season-layout">
@@ -283,9 +292,9 @@
       <section id="trajets" class="chapter route-section">
         <div class="wrap">
           <div class="section-intro">
-            <h2 id="route-title">Un détour peut réduire<br />l’exposition au soleil</h2>
+            <h2 id="route-title">Moins de soleil, quel détour ?</h2>
             <p>
-              Deux chemins, un même départ et une même arrivée.
+              Sur trois trajets, nous comparons le plus court au parcours Canopée. Le gain d’ombre se lit avec son coût : quelques minutes de marche supplémentaires, parfois davantage.
             </p>
           </div>
           <div class="route-controls">
@@ -379,8 +388,8 @@
               l’ombre en hiver (coût : longueur × [1 + 30 × part défavorable]).
               Le calcul peut donc proposer un détour important. L’heure est
               figée pendant tout le trajet. Les trois exemples partagent la
-              même échelle pour la saison et l’heure choisies. Le zoom
-              s’adapte aux détours lorsque ces réglages changent. Les tracés
+              même échelle dans une saison, quelle que soit l’heure choisie.
+              Le cadrage reste stable pendant la comparaison. Les tracés
               viennent du réseau IGN ; l’animation ne représente pas la durée réelle.
             </p>
             <p>
@@ -414,9 +423,9 @@
       <section id="demain" class="chapter">
         <div class="wrap">
         <div class="section-intro">
-          <h2>Les arbres grandissent.<br />Des besoins restent.</h2>
+          <h2>Grandir ne suffira pas</h2>
           <p>
-            En 2036, que changerait la croissance des jeunes arbres actuels ?
+            La croissance des jeunes arbres actuels améliore peu la couverture à elle seule. Ce scénario invite à compléter l’existant par des aménagements ciblés.
           </p>
         </div>
         <div class="future-layout">
@@ -463,8 +472,8 @@
 
       <section id="outil" class="tool-finale" aria-labelledby="tool-finale-title">
         <div class="wrap tool-finale-layout">
+          <h2 id="tool-finale-title">Le GPS des jours de chaleur</h2>
           <div>
-            <h2 id="tool-finale-title">Le GPS des<br />jours de chaleur.</h2>
             <p>Une adresse de départ, une destination. À pied ou à vélo, choisissez votre exposition au soleil et trouvez votre chemin avec Canopée.</p>
           </div>
           <div class="tool-showcase">
@@ -472,7 +481,6 @@
             <div id="tool-preview-map" role="img" aria-label="Aperçu 3D du trajet Canopée de République à Arts et Métiers, avec les bâtiments et l’ombre des rues"></div>
             <div class="preview-caption"><span>Depuis République</span><span class="metro-stop">Arts et Métiers</span></div>
             <span id="preview-status" class="preview-status">Aperçu 3D, été à 16 h</span>
-            <button class="preview-pause" id="preview-pause" type="button" aria-pressed="false">Pause rotation</button>
           </div>
           <a class="primary-cta" href="./index.html">Ouvrir Canopée </a>
           </div>
@@ -504,12 +512,12 @@
             <li>
               <a
                 id="traffic-source"
-                href="https://github.com/hackathons-mobilites/hackaviz_2026"
-                >IDFM 2025 via Projet_equipe_3, Fréquentation ferroviaire</a
+                href="https://data.iledefrance-mobilites.fr/explore/dataset/histo-validations-reseau-ferre/"
+                >IDFM, validations ferroviaires 2025</a
               >
-              : agrégats extraits du graphique publié, rapprochement
-              conservateur, couverture partielle. Une validation n’est pas un
-              voyageur unique.
+              : totaux recalculés depuis les quatre fichiers trimestriels officiels,
+              par identifiant de station. <a href="https://opendatacommons.org/licenses/odbl/1-0/">Licence ODbL</a>. Les petits effectifs
+              sont masqués par le producteur. Une validation n’est pas un voyageur unique.
             </li>
             <li>
               <a href="https://geoservices.ign.fr/bdtopo">IGN, BD TOPO</a> :
@@ -571,7 +579,7 @@
             >Données du récit</a
           ><a href="./data/story-hex.json" download
             >Hexagones par heure</a
-          ><a href="./data/hackaviz-validations-2025.json" download
+          ><a href="./data/idfm-validations-2025.json" download
             >Validations IDFM et provenance</a
           >
         </div>

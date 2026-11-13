@@ -7,8 +7,9 @@ const METERS_PER_LONGITUDE_DEGREE =
   METERS_PER_LATITUDE_DEGREE * Math.cos(48.86 * RADIANS_PER_DEGREE);
 
 /**
- * One metric scale shared by every example in the selected season and hour.
- * Switching examples keeps that scale; changing season or hour may reframe it.
+ * One metric scale shared by every example in the selected season.
+ * Omitting hour keeps both scale and center stable through a day's variants.
+ * A specified hour limits the fit to that frame for standalone callers.
  * Without a context, every variant is included for callers needing one fixed
  * frame across the complete dataset. Road context never determines the zoom.
  *
@@ -22,8 +23,8 @@ export function createRouteProjections(
   { width = 600, height = 420, padding, season, hour } = {},
 ) {
   const contextual = season !== undefined || hour !== undefined;
-  if (contextual && (season === undefined || hour === undefined)) {
-    throw new Error("Route projections need both a season and an hour");
+  if (hour !== undefined && season === undefined) {
+    throw new Error("An hour requires a season");
   }
   // The context view has no heading inside the SVG. Reserve the bottom strip
   // for the scale bar, including the full endpoint marker above its cartouche.
@@ -39,7 +40,7 @@ export function createRouteProjections(
 
   const extents = examples.map((example) => {
     const comparisons = contextual
-      ? example.comparisons.filter(comparison => comparison.season === season && comparison.hour === hour)
+      ? example.comparisons.filter(comparison => comparison.season === season && (hour === undefined || comparison.hour === hour))
       : example.comparisons;
     const points = comparisons.flatMap((comparison) => [
       ...comparison.shortest.path,

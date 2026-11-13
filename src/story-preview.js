@@ -1,22 +1,16 @@
 export function createToolPreview(data, motion) {
   const container = document.getElementById('tool-preview-map');
-  const button = document.getElementById('preview-pause');
   const status = document.getElementById('preview-status');
-  let map, frame, lastTime, ready = false, visible = false, paused = false, starting = false;
-  const syncButton = () => {
-    button.textContent = paused ? 'Reprendre la rotation' : 'Pause rotation';
-    button.setAttribute('aria-pressed', String(paused));
-  };
+  let map, frame, lastTime, ready = false, visible = false, starting = false;
   const stop = () => { cancelAnimationFrame(frame); frame = null; lastTime = null; };
   const tick = time => {
     frame = null;
-    if (!ready || !visible || paused || document.hidden || motion.reduced()) return;
+    if (!ready || !visible || document.hidden || motion.reduced()) return;
     if (lastTime != null) map.setBearing(map.getBearing() + Math.min(80,time-lastTime)*.004);
     lastTime = time;
     frame = requestAnimationFrame(tick);
   };
-  const resume = () => { stop(); if (ready && visible && !paused && !document.hidden && !motion.reduced()) frame = requestAnimationFrame(tick); };
-  button.addEventListener('click', () => { paused = !paused; syncButton(); resume(); });
+  const resume = () => { stop(); if (ready && visible && !document.hidden && !motion.reduced()) frame = requestAnimationFrame(tick); };
   async function start() {
     if (starting) return;
     starting = true;
@@ -64,7 +58,6 @@ export function createToolPreview(data, motion) {
       new ResizeObserver(()=>map.resize()).observe(container);
     } catch (error) {
       status.textContent = 'Ouvrez la carte pour explorer le quartier.';
-      button.hidden = true;
       container.dataset.error = error.message;
     }
   }
@@ -73,6 +66,6 @@ export function createToolPreview(data, motion) {
     if (visible) { start(); resume(); } else stop();
   }, {threshold:.15}).observe(container);
   document.addEventListener('visibilitychange',resume);
-  motion.onChange(reduced=> { button.hidden = reduced; resume(); });
+  motion.onChange(resume);
   window.addEventListener('pagehide',()=>{stop();map?.remove();});
 }
