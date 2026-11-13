@@ -15,12 +15,12 @@
       <div class="itineraire">
         <div class="trajet-groupe">
           <form id="form-a" class="champ">
-            <span class="point point-a" aria-hidden="true"></span>
+            <span class="point" aria-hidden="true">A</span>
             <label class="sr-only" for="adresse-a">Départ</label>
             <input id="adresse-a" type="search" placeholder="Départ" required autocomplete="street-address" />
           </form>
           <form id="form-b" class="champ">
-            <span class="point point-b" aria-hidden="true"></span>
+            <span class="point" aria-hidden="true">B</span>
             <label class="sr-only" for="adresse-b">Arrivée</label>
             <input id="adresse-b" type="search" placeholder="Arrivée" required autocomplete="street-address" />
           </form>
@@ -35,10 +35,18 @@
         <div class="trajet-outils">
           <button type="button" id="effacer">Effacer</button>
         </div>
+        <div class="segments" id="allure" role="group" aria-label="Allure">
+          <button type="button" id="allure-pied" aria-pressed="true">À pied</button>
+          <button type="button" id="allure-velo" aria-pressed="false">À vélo</button>
+        </div>
         <p class="trajet-resultat" id="trajet-resultat" aria-live="polite">Chargement de Paris…</p>
+        <p class="temps-velo" id="temps-velo" hidden></p>
         <p class="trajet-contexte" id="trajet-contexte"></p>
       </div>
 
+      <div class="segments" role="group" aria-label="Instant">
+        <button type="button" id="mode-direct" aria-pressed="false">Direct</button>
+      </div>
       <div class="segments" role="group" aria-label="Année">
         <button type="button" id="vue-aujourdhui" aria-pressed="true">2026</button>
         <button type="button" id="vue-future" aria-pressed="false">2036</button>
@@ -47,10 +55,16 @@
         <button type="button" id="saison-ete" aria-pressed="true">Été</button>
         <button type="button" id="saison-hiver" aria-pressed="false">Hiver</button>
       </div>
+      <div class="soleil-crans" id="soleil-crans" role="group" aria-label="Soleil">
+        <button type="button" data-accept="0" aria-pressed="true">Pas de soleil</button>
+        <button type="button" data-accept="33" aria-pressed="false">Un peu</button>
+        <button type="button" data-accept="67" aria-pressed="false">Beaucoup</button>
+        <button type="button" data-accept="100" aria-pressed="false">Plein soleil</button>
+      </div>
       <p class="objectif" id="vue-explication">
         <span class="objectif-icone" id="objectif-icone" aria-hidden="true"></span>
         <span>
-          <strong id="objectif-but">Le trajet cherche l’ombre.</strong>
+          <strong id="objectif-but">Le trajet évite le soleil.</strong>
           <span class="suite" id="objectif-suite"></span>
         </span>
       </p>
@@ -84,10 +98,7 @@
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="heure-centre">
-          <p class="heure" id="heure-lue"><span id="heure-nombre">16</span> h</p>
-          <button type="button" id="lecture" aria-pressed="false" aria-label="Lire les heures">
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5.2 3.2v9.6L13 8z" fill="currentColor"/></svg>
-          </button>
+          <p class="heure" id="heure-lue"><span id="heure-nombre">16</span><span id="heure-unite"> h</span></p>
         </div>
         <button type="button" id="suivant" aria-label="Heure suivante">
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -96,38 +107,22 @@
       <label class="sr-only" for="heure">Heure</label>
       <input id="heure" type="range" min="7" max="21" step="1" value="16" />
       <div class="ticks" aria-hidden="true"><span>7</span><span>12</span><span>16</span><span>21</span></div>
+      <button type="button" id="lecture" class="lecture" aria-pressed="false" aria-label="Lire les heures">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5.2 3.2v9.6L13 8z" fill="currentColor"/></svg>
+      </button>
     </section>
 
     <aside class="cle" id="cle" aria-label="Légende">
       <span class="cle-titre">Lire la carte <small id="lecture-mode">Ombre moyenne des rues par secteur</small></span>
-      <span class="sr-only">Dégradé de la part d’ombre, de 0 % au soleil à 100 % à l’ombre.</span>
-      <span class="degrade" id="degrade" aria-hidden="true"></span>
-      <span class="deg-labels" aria-hidden="true"><span>Exposé</span><span>Ombragé</span></span>
-      <div class="nuancier">
-        <p class="nuancier-titre">Dégradé des rues</p>
-        <div class="presets" role="group" aria-label="Préréglages du dégradé">
-          <button type="button" data-preset="ocre" aria-pressed="false">
-            <span>1 Ocre</span>
-            <span class="barre" style="background: linear-gradient(90deg, #F6E3A1, #E0A04A, #3E4C59)"></span>
-          </button>
-          <button type="button" data-preset="idfm" aria-pressed="false">
-            <span>2 Île-de-France Mobilités</span>
-            <span class="barre" style="background: linear-gradient(90deg, #F4D27A, #5BA3D9, #0055A4)"></span>
-          </button>
-          <button type="button" data-preset="ratp" aria-pressed="false">
-            <span>3 RATP</span>
-            <span class="barre" style="background: linear-gradient(90deg, #F6E7C1, #7BC47F, #00843D)"></span>
-          </button>
-          <button type="button" data-preset="mixte" aria-pressed="false">
-            <span>4 Ocre bleu vert</span>
-            <span class="barre" style="background: linear-gradient(90deg, #F2C14E, #0072CE, #006B3F)"></span>
-          </button>
-        </div>
-        <div class="teintes">
-          <label>Exposé <input id="couleur-expose" type="color" value="#da6840"></label>
-          <label>Ombragé <input id="couleur-ombre" type="color" value="#176778"></label>
-        </div>
+      <span class="sr-only">Part d’ombre, de exposé à ombragé.</span>
+      <div class="echelle" id="degrade">
+        <span class="echelle-mot">Exposé</span>
+        <span class="hexes" aria-hidden="true">
+          <i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i><i class="hex"></i>
+        </span>
+        <span class="echelle-mot">Ombragé</span>
       </div>
+      <p class="nuancier-titre">Île-de-France Mobilités</p>
       <ul class="symboles">
         <li>
           <label class="symbole">
@@ -155,6 +150,13 @@
             <input id="couche-stations" type="checkbox" checked />
             <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="#214c83"/><rect x="5.6" y="5.8" width="6.6" height="5.6" rx="1" fill="#fff"/><path d="M6.6 7.2h1.6v1.6H6.6zm3 0h1.6v1.6H9.6z" fill="#214c83"/></svg>
             Arrêt
+          </label>
+        </li>
+        <li>
+          <label class="symbole">
+            <input id="couche-velib" type="checkbox" checked />
+            <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="#0b6e4f"/><circle cx="6.2" cy="11.2" r="1.7" fill="none" stroke="#fff" stroke-width="1"/><circle cx="11.8" cy="11.2" r="1.7" fill="none" stroke="#fff" stroke-width="1"/><path d="M6.2 11.2 8.4 7.6h2.2L11.8 11.2M8.4 7.6h2.2" fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round"/></svg>
+            Vélib
           </label>
         </li>
         <li id="legende-alerte">
