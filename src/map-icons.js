@@ -87,6 +87,25 @@ function cool(ctx) {
   ctx.fill();
 }
 
+function velo(ctx) {
+  disc(ctx, "#0b6e4f");
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.arc(11.2, 19.4, 3.15, 0, Math.PI * 2);
+  ctx.arc(20.8, 19.4, 3.15, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(11.2, 19.4);
+  ctx.lineTo(15.4, 13.1);
+  ctx.lineTo(20.8, 19.4);
+  ctx.moveTo(15.4, 13.1);
+  ctx.lineTo(18.6, 13.1);
+  ctx.stroke();
+}
+
 function station(ctx, alert) {
   disc(ctx, alert ? "#b34012" : "#214c83");
   ctx.fillStyle = "#ffffff";
@@ -160,6 +179,7 @@ export function registerMapIcons(map) {
   map.addImage("picto-fontaine", animatedFountain(), { pixelRatio: SCALE });
   map.addImage("picto-fraicheur", staticImage(cool), { pixelRatio: SCALE });
   map.addImage("picto-arbre", staticImage(tree), { pixelRatio: SCALE });
+  map.addImage("picto-velo", staticImage(velo), { pixelRatio: SCALE });
   map.addImage("picto-station", staticImage((ctx) => station(ctx, false)), { pixelRatio: SCALE });
   map.addImage("picto-station-alerte", staticImage((ctx) => station(ctx, true)), { pixelRatio: SCALE });
 }
