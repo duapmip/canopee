@@ -323,7 +323,7 @@ export function createRouter(buffer, inside, treeBuffer) {
     return { ok: true, lon: best.lon, lat: best.lat, t: best.t, edge: best.edge, gap: best.gap };
   }
 
-  function plan(lonA, latA, lonB, latB, season, hourIndex, future = false) {
+  function plan(lonA, latA, lonB, latB, season, hourIndex, future = false, live = null, accept = 0) {
     const a = snap(lonA, latA);
     if (!a.ok) return a;
     const b = snap(lonB, latB);
@@ -338,12 +338,20 @@ export function createRouter(buffer, inside, treeBuffer) {
       generation = 1;
     }
     const table = season === "hiver" ? winter : shade;
-    const sunUp = table[a.edge * 15 + hourIndex] !== 255;
+    const sunUp = live ? Boolean(live.up) : table[a.edge * 15 + hourIndex] !== 255;
+    const fracOf = (edge) => (
+      live
+        ? live.fraction(edge, ax[edge], ay[edge], bx[edge], by[edge])
+        : share(edge, hourIndex, season, future)
+    );
+    const pull = Math.max(-1, Math.min(1, (Number(accept) - 50) / 50));
+    const strength = Math.abs(pull);
     const factor = (edge) => {
-      if (!sunUp) return 1;
-      const frac = share(edge, hourIndex, season, future);
-      const exposure = season === "hiver" ? frac : 1 - frac;
-      return 1 + PREFERENCE * exposure;
+      if (!sunUp || strength === 0) return 1;
+      const frac = fracOf(edge);
+      if (!(frac >= 0)) return 1;
+      const exposure = pull > 0 ? frac : 1 - frac;
+      return 1 + PREFERENCE * strength * exposure;
     };
 
     const extras = new Map();
@@ -480,7 +488,7 @@ export function createRouter(buffer, inside, treeBuffer) {
       if (t0 == null || t1 == null) continue;
       const portion = Math.abs(t1 - t0) * len[edge];
       if (portion < 0.4) continue;
-      const s = share(edge, hourIndex, season, future);
+      const s = fracOf(edge);
       const lon0 = ax[edge] + (bx[edge] - ax[edge]) * t0;
       const lat0 = ay[edge] + (by[edge] - ay[edge]) * t0;
       const lon1 = ax[edge] + (bx[edge] - ax[edge]) * t1;
@@ -497,7 +505,7 @@ export function createRouter(buffer, inside, treeBuffer) {
       if (s >= 0) {
         known += portion;
         shaded += s * portion;
-        shadedToday += share(edge, hourIndex, season, false) * portion;
+        shadedToday += (live ? s : share(edge, hourIndex, season, false)) * portion;
       }
     }
     return {
@@ -512,7 +520,73 @@ export function createRouter(buffer, inside, treeBuffer) {
     };
   }
 
-  return { nEdges, nChunks, farCollection, overviewCollection, edgesIn, nearCollection, shadeAround, snap, plan };
+  function coloredEdges(ids, fraction) {
+    const features = [];
+    for (const e of ids) {
+      const s = fraction(e, ax[e], ay[e], bx[e], by[e]);
+      if (!(s >= 0)) continue;
+      features.push({
+        type: "Feature",
+        properties: { s, g: 0 },
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [ax[e], ay[e]],
+            [bx[e], by[e]],
+          ],
+        },
+      });
+    }
+    return { type: "FeatureCollection", features };
+  }
+
+  function chunkSample(c, fraction) {
+    const count = chunkCount[c];
+    if (!count) return -1;
+    const edge = chunkStart[c] + (count >> 1);
+    return fraction(edge, ax[edge], ay[edge], bx[edge], by[edge]);
+  }
+
+  function liveFar(fraction) {
+    const values = new Array(nChunks);
+    const gains = new Array(nChunks).fill(0);
+    for (let c = 0; c < nChunks; c++) values[c] = chunkSample(c, fraction);
+    return featuresFrom(chunkCoords, values, gains);
+  }
+
+  function liveOverview(fraction) {
+    const features = [];
+    for (const hex of hexes.values()) {
+      if (!inside(hex.lon, hex.lat)) continue;
+      let sum = 0;
+      let weight = 0;
+      for (const c of hex.chunks) {
+        const value = chunkSample(c, fraction);
+        if (!(value >= 0)) continue;
+        const count = chunkCount[c];
+        sum += value * count;
+        weight += count;
+      }
+      if (weight < 8) continue;
+      const ring = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i - 30);
+        ring.push([
+          hex.lon + (HEX_RADIUS_M * Math.cos(angle)) / M_LON,
+          hex.lat + (HEX_RADIUS_M * Math.sin(angle)) / M_LAT,
+        ]);
+      }
+      ring.push(ring[0]);
+      features.push({
+        type: "Feature",
+        properties: { s: sum / weight },
+        geometry: { type: "Polygon", coordinates: [ring] },
+      });
+    }
+    return { type: "FeatureCollection", features };
+  }
+
+  return { nEdges, nChunks, farCollection, overviewCollection, liveFar, liveOverview, edgesIn, nearCollection, coloredEdges, shadeAround, snap, plan };
 }
 
 export function indexBuildings(buffer) {
@@ -643,5 +717,77 @@ export function indexBuildings(buffer) {
     return { type: "FeatureCollection", features: out };
   }
 
-  return { count, featuresIn, cityMesh };
+  const INDEX_CELL = 0.002;
+  let grid = null;
+
+  function ensureGrid() {
+    if (grid) return;
+    grid = new Map();
+    for (let i = 0; i < count; i++) {
+      if (!(hdm[i] > 0) || !Number.isFinite(minLon[i])) continue;
+      const x0 = Math.floor(minLon[i] / INDEX_CELL);
+      const x1 = Math.floor(maxLon[i] / INDEX_CELL);
+      const y0 = Math.floor(minLat[i] / INDEX_CELL);
+      const y1 = Math.floor(maxLat[i] / INDEX_CELL);
+      if (x1 - x0 > 20 || y1 - y0 > 20) continue;
+      for (let x = x0; x <= x1; x++) {
+        for (let y = y0; y <= y1; y++) {
+          const key = `${x},${y}`;
+          let list = grid.get(key);
+          if (!list) grid.set(key, (list = []));
+          list.push(i);
+        }
+      }
+    }
+  }
+
+  const ringCache = new Array(count);
+  function exterior(i) {
+    if (ringCache[i] !== undefined) return ringCache[i];
+    let at = offset[i] + 2;
+    const nParts = view.getUint8(at++);
+    if (nParts < 1) {
+      ringCache[i] = null;
+      return null;
+    }
+    const nRings = view.getUint8(at++);
+    if (nRings < 1) {
+      ringCache[i] = null;
+      return null;
+    }
+    const nPts = view.getUint16(at, true);
+    at += 2;
+    const read = readRing(at, nPts);
+    ringCache[i] = read.coords;
+    return read.coords;
+  }
+
+  function inBox(west, south, east, north) {
+    ensureGrid();
+    const x0 = Math.floor(west / INDEX_CELL);
+    const x1 = Math.floor(east / INDEX_CELL);
+    const y0 = Math.floor(south / INDEX_CELL);
+    const y1 = Math.floor(north / INDEX_CELL);
+    const seen = new Set();
+    const out = [];
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        const list = grid.get(`${x},${y}`);
+        if (!list) continue;
+        for (const i of list) {
+          if (seen.has(i)) continue;
+          seen.add(i);
+          if (maxLon[i] < west || minLon[i] > east || maxLat[i] < south || minLat[i] > north) continue;
+          out.push(i);
+        }
+      }
+    }
+    return out;
+  }
+
+  function heightOf(i) {
+    return hdm[i] / 10;
+  }
+
+  return { count, featuresIn, cityMesh, inBox, exterior, heightOf };
 }
