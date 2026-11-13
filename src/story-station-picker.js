@@ -12,12 +12,12 @@ export function createStationPicker(container, stations, selectedId, onSelect) {
   const items = stations.map(station => ({
     id: String(station.id),
     name: station.name,
-    search: normalize(station.name),
+    search: normalize(station.name + ' ' + (station.trafficName || '')),
   }));
   const byId = new Map(items.map(station => [station.id, station]));
   const shortcutNames = ["Châtelet", "République", "Gare de Lyon"];
   const shortcuts = shortcutNames
-    .map(name => items.find(station => station.search === normalize(name)))
+    .map(name => items.find(station => normalize(station.name) === normalize(name)))
     .filter(Boolean);
   const initialSuggestions = [...shortcuts, ...items.filter(station => !shortcuts.includes(station))];
   let selected = byId.get(String(selectedId));
@@ -30,36 +30,42 @@ export function createStationPicker(container, stations, selectedId, onSelect) {
   const prefix = container.id || "station-picker";
 
   container.innerHTML = `
-    <div class="station-picker-search">
-      <label class="station-picker-label">Explorer une station</label>
+    <div class="station-picker-sign">
       <input class="station-picker-input" type="search" role="combobox"
         aria-autocomplete="list" aria-expanded="false" autocomplete="off"
-        spellcheck="false" placeholder="Nom d’une station" />
+        spellcheck="false" placeholder="Rechercher une station" aria-label="Rechercher une station" />
+      <button class="station-picker-toggle" type="button" aria-label="Afficher les stations" aria-expanded="false"><span class="station-picker-chevron" aria-hidden="true"></span></button>
+    </div>
+    <div class="station-picker-panel" hidden>
       <ul class="station-picker-results" role="listbox" aria-label="Stations proposées" hidden></ul>
     </div>
     <span class="sr-only station-picker-help">Saisissez un nom. Utilisez les flèches pour parcourir les propositions, puis Entrée pour choisir.</span>
-    <span class="sr-only station-picker-status" role="status" aria-live="polite"></span>
-    <div class="station-picker-shortcuts" role="group" aria-label="Accès rapides aux stations"></div>`;
+    <span class="sr-only station-picker-status" role="status" aria-live="polite"></span>`;
   const input = container.querySelector(".station-picker-input");
-  const label = container.querySelector(".station-picker-label");
+  const sign = container.querySelector(".station-picker-sign");
+  const trigger = container.querySelector(".station-picker-toggle");
+  const panel = container.querySelector(".station-picker-panel");
   const list = container.querySelector(".station-picker-results");
   const help = container.querySelector(".station-picker-help");
   const status = container.querySelector(".station-picker-status");
-  const shortcutGroup = container.querySelector(".station-picker-shortcuts");
   input.id = prefix + "-input";
-  label.htmlFor = input.id;
+  panel.id = prefix + "-panel";
+  trigger.setAttribute("aria-controls", panel.id);
   list.id = prefix + "-results";
   help.id = prefix + "-help";
   input.setAttribute("aria-controls", list.id);
   input.setAttribute("aria-describedby", help.id);
 
-  function close(restore = true) {
+  function close() {
     isOpen = false;
     activeIndex = -1;
     list.hidden = true;
+    panel.hidden = true;
+    sign.classList.remove("is-open");
+    trigger.setAttribute("aria-expanded", "false");
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("aria-activedescendant");
-    if (restore) input.value = selected?.name || "";
+    input.value = selected?.name || "";
     status.textContent = "";
   }
 
@@ -111,7 +117,10 @@ export function createStationPicker(container, stations, selectedId, onSelect) {
       list.append(empty);
     }
     isOpen = true;
+    sign.classList.add("is-open");
+    panel.hidden = false;
     list.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
     input.setAttribute("aria-expanded", "true");
     setActive(-1);
     status.textContent = matches.length
@@ -124,47 +133,48 @@ export function createStationPicker(container, stations, selectedId, onSelect) {
     const station = byId.get(String(id));
     if (!station) return false;
     selected = station;
+    input.title = station.name;
     close();
-    for (const button of shortcutGroup.querySelectorAll("button")) {
-      button.setAttribute("aria-pressed", String(button.dataset.stationId === station.id));
-    }
     return true;
   }
 
   function choose(id) {
-    if (setValue(id)) onSelect(String(id));
+    if (setValue(id)) {
+      trigger.focus({ preventScroll: true });
+      onSelect(String(id));
+    }
   }
 
-  for (const station of shortcuts) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "station-picker-shortcut";
-    button.dataset.stationId = station.id;
-    button.textContent = station.name;
-    button.setAttribute("aria-pressed", "false");
-    listen(button, "pointerdown", event => {
-      if (event.button !== 0) return;
-      // Selection updates the inspector in place; native pointer focus must
-      // not scroll the document to the button before that update.
-      event.preventDefault();
-      button.focus({ preventScroll: true });
-    });
-    listen(button, "click", () => choose(station.id));
-    shortcutGroup.append(button);
-  }
-  shortcutGroup.hidden = !shortcuts.length;
-  listen(input, "focus", () => {
-    open();
-    input.select();
+  listen(trigger, "pointerdown", event => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    trigger.focus({ preventScroll: true });
   });
-  listen(input, "click", () => {
-    if (!isOpen) {
-      open(input.value === selected?.name ? "" : input.value);
-      input.select();
+  listen(trigger, "click", () => {
+    if (isOpen) close();
+    else {
+      input.value = "";
+      input.focus({ preventScroll: true });
+      open();
     }
   });
+  listen(input, "pointerdown", event => {
+    if (event.button !== 0 || isOpen) return;
+    event.preventDefault();
+    input.value = "";
+    input.focus({ preventScroll: true });
+    open();
+  });
+  listen(input, "focus", () => {
+    if (!isOpen) { input.value = ""; open(); }
+  });
   listen(input, "input", () => open(input.value));
-  listen(input, "blur", () => close());
+  listen(container, "focusout", event => {
+    if (!container.contains(event.relatedTarget)) close();
+  });
+  listen(document, "pointerdown", event => {
+    if (!container.contains(event.target)) close();
+  });
   // Keep focus on the combobox while choosing an option with mouse or touch.
   listen(list, "pointerdown", event => event.preventDefault());
   listen(list, "click", event => {
@@ -174,7 +184,7 @@ export function createStationPicker(container, stations, selectedId, onSelect) {
   listen(input, "keydown", event => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      if (!isOpen) open(input.value === selected?.name ? "" : input.value);
+      if (!isOpen) open(input.value);
       if (visible.length) {
         const step = event.key === "ArrowDown" ? 1 : -1;
         const next = activeIndex < 0
@@ -185,7 +195,7 @@ export function createStationPicker(container, stations, selectedId, onSelect) {
     } else if (event.key === "Enter" && isOpen) {
       const choice = activeIndex >= 0
         ? visible[activeIndex]
-        : visible.find(station => station.search === normalize(input.value));
+        : visible.find(station => normalize(station.name) === normalize(input.value)) || (visible.length === 1 ? visible[0] : null);
       if (choice) {
         event.preventDefault();
         choose(choice.id);
@@ -193,7 +203,8 @@ export function createStationPicker(container, stations, selectedId, onSelect) {
     } else if (event.key === "Escape" && isOpen) {
       event.preventDefault();
       close();
-    } else if (event.key === "Tab") close();
+      trigger.focus({ preventScroll: true });
+    }
   });
   setValue(selectedId);
 

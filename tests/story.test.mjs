@@ -12,7 +12,7 @@ test("Station denominators and unique traffic joins are consistent", () => {
   );
   const matched = data.stations.filter((s) => s.validations != null);
   assert.equal(matched.length, data.traffic.matched);
-  assert.equal(new Set(matched.map((s) => s.trafficName)).size, matched.length);
+  assert.equal(new Set(matched.map((s) => s.trafficId)).size, matched.length);
   assert(
     matched.every((s) => Number.isInteger(s.validations) && s.validations > 0),
   );
@@ -39,6 +39,23 @@ test("Night is missing daylight, not zero shade or a sunny street", () => {
   assert.equal(data.hourly.find((h) => h.hour === 7).winterShade, null);
   assert.equal(data.hourly.find((h) => h.hour === 21).winterShade, null);
   assert(data.hourly.find((h) => h.hour === 13).winterShade > 0);
+});
+
+test("Traffic totals come from four official quarters and join on stable IDs", () => {
+  const traffic = JSON.parse(readFileSync(new URL('../public/data/idfm-validations-2025.json',import.meta.url)));
+  assert.equal(new URL(traffic.download).hostname, 'data.iledefrance-mobilites.fr');
+  assert.equal(traffic.files.length,4);
+  assert.deepEqual(traffic.files.map(f=>f.days),[90,91,92,92]);
+  const rows = new Map(traffic.rows.map(r=>[r.id,r]));
+  for(const station of data.stations) {
+    const source = rows.get(station.id);
+    if(source?.quarters.length===4) {
+      assert.equal(station.validations,source.freq);
+      assert.equal(station.validationsLower,source.lower);
+      assert(source.freq >= source.lower);
+      assert(source.freq - source.lower <= source.maskedRows * 5);
+    } else assert.equal(station.validations,null);
+  }
 });
 
 test("All 24 route comparisons preserve distance, time and optimization constraints", () => {

@@ -126,10 +126,11 @@ async function init() {
     matched.length +
     " stations sur " +
     data.stations.length +
-    '. Validations 2025 : IDFM, agrégats de <a href="' +
-    esc(data.traffic.url) +
-    '" target="_blank" rel="noreferrer">l’équipe 3</a>.';
+    '. Un point par station. Validations IDFM 2025 ; ombre modélisée à 16 h.';
   $("traffic-source").href = data.traffic.url;
+  const busyStations = [...matched].sort((a, b) => b.validations - a.validations).slice(0, 10);
+  const busyExposed = busyStations.filter(s => s.shadeToday[at16] < 40).length;
+  $("station-analysis").textContent = busyExposed + ' des 10 pôles les plus fréquentés de notre périmètre ont moins de 40 % d’ombre autour du point de station étudié. Croiser usage et exposition aide à prioriser les accès à protéger.';
   $("station-table").innerHTML = byName
     .map(
       (s) =>
@@ -148,9 +149,7 @@ async function init() {
     const s = selected,
       shade = s.shadeToday[at16];
     $("station-detail").innerHTML =
-      '<h4 class="station-name">' +
-      esc(s.name) +
-      '</h4><dl class="station-values"><div><dt>Validations en 2025</dt><dd>' +
+      '<dl class="station-values"><div><dt>Validations du pôle, 2025</dt><dd>' +
       fmt(s.validations / 1e6, 1) +
       " M</dd></div><div><dt>Rues à l’ombre, 16 h</dt><dd>" +
       shade +
@@ -178,7 +177,7 @@ async function init() {
     let svg =
       '<title id="scatter-title">Fréquentation et exposition des abords</title><desc id="scatter-desc">' +
       matched.length +
-      " stations. Exposition au soleil de 0 à 100 % ; validations de 0 à 60 millions. Tableau disponible après le graphique.</desc>";
+      " stations. Exposition au soleil de 0 à 100 % ; validations de 0 à " + maximum / 1e6 + " millions. Tableau disponible après le graphique.</desc>";
     svg +=
       '<rect x="' +
       x(60) +
@@ -196,11 +195,12 @@ async function init() {
         text(53, y(v * 1e6) + 5, v, 'text-anchor="end"');
     }
     svg +=
-      text(65, 21, "Validations en 2025, millions", 'class="axis-label"') +
+      text(16, 18, "Validations annuelles", 'text-anchor="start" class="axis-label"') +
+      text(16, 36, "en millions", 'text-anchor="start" style="font-size:12px"') +
       text(
         368,
         414,
-        "Part des rues au soleil à 16 h",
+        "Rues au soleil autour de la station",
         'text-anchor="middle" class="axis-label"',
       ) +
       text(
@@ -446,14 +446,14 @@ async function init() {
     const example = data.examples.find((e) => e.id === routeValue("route-choice")),
       season = routeValue("route-season"),
       hour = Number(routeValue("route-hour"));
-    const routeMaps = createRouteProjections(data.examples, { season, hour });
+    const routeMaps = createRouteProjections(data.examples, { season });
     const comparison = example.comparisons.find(
       (c) => c.season === season && c.hour === hour,
     );
     const a = comparison.shortest,
       b = comparison.preferred,
       winter = season === "hiver";
-    $("route-title").innerHTML = winter ? "Un détour peut offrir<br>plus de soleil" : "Un détour peut réduire<br>l’exposition au soleil";
+    $("route-title").textContent = winter ? "Plus de soleil, quel détour ?" : "Moins de soleil, quel détour ?";
     const avoided = winter
         ? a.shadeMinutes - b.shadeMinutes
         : a.sunMinutes - b.sunMinutes,

@@ -43,8 +43,6 @@ export function createHexAtlas(data, motion) {
     svg.append(polygon);
     return polygon;
   });
-  svg.append(element("path", { d: "M25 48V26m-4 7 4-7 4 7", fill: "none", stroke: "#6e6e73", "stroke-width": 1.2 }));
-  svg.append(element("text", { x: 25, y: 19, "text-anchor": "middle", fill: "#6e6e73", "font-size": 12 }, "N"));
 
   let hour = 16;
   let timer = null;
@@ -65,12 +63,10 @@ export function createHexAtlas(data, motion) {
       hex.querySelector("title").textContent = "Secteur " + (i + 1) + ", " + hour + " h : " + (shade == null ? "données insuffisantes" : percent(shade * 100) + " d’ombre sur les rues");
     });
     description.textContent = frame.known + " hexagones de 260 mètres de rayon. À " + hour + " heures, " + frame.lowShade + " ont moins de 40 % d’ombre sur leurs rues calculées. Même modèle que la carte Canopée, le 25 juin 2026.";
-    $("atlas-context").textContent = "25 juin 2026";
     $("atlas-hour-label").textContent = hour + " h";
     $("atlas-hour").value = String(hour);
     $("atlas-hour").setAttribute("aria-valuetext", hour + " heures");
     $("hero-percent").textContent = percent(frame.lowShadePercent);
-    $("atlas-fact-note").textContent = "À " + hour + " h, " + frame.lowShade + " sur " + frame.known + " secteurs calculés.";
   }
   function setPlaying(value) {
     playing = value;
