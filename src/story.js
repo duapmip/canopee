@@ -31,7 +31,7 @@ const colors = {
   sun: "#f4c64e",
   ink: "#1d1d1f",
   muted: "#6e6e73",
-  route: "#7a2be2",
+  route: "#142b44",
 };
 const line = (coords) =>
   coords
@@ -462,7 +462,7 @@ async function init() {
     let svg =
       "<title>" +
       esc(example.from + " vers " + example.to) +
-      "</title><desc>Comparaison du chemin le plus court, en tirets, et de Canopée, en violet. " +
+      "</title><desc>Comparaison du chemin le plus court, en tirets, et de Canopée, en bleu nuit. " +
       fmt(a.minutes, 1) +
       " contre " +
       fmt(b.minutes, 1) +
@@ -478,7 +478,9 @@ async function init() {
       line(b.path.map(p)) +
       '" fill="none" stroke="' +
       colors.route +
-      '" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle data-route-marker r="6" fill="#7a2be2" stroke="#ffffff" stroke-width="3" opacity="0" aria-hidden="true"/>';
+      '" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle data-route-marker r="6" fill="' +
+      colors.route +
+      '" stroke="#ffffff" stroke-width="3" opacity="0" aria-hidden="true"/>';
     // Offset only the map label, never the route geometry.
     for (const [point, label] of [
       [a.path[0], "A"],
