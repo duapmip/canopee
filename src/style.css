@@ -778,9 +778,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.28); }
   .cle {
     top: auto;
     right: 8px;
-    bottom: 254px;
+    bottom: 288px;
     width: min(210px, calc(100% - 16px));
-    max-height: min(24vh, clamp(90px, calc(54dvh - 266px), 222px));
+    max-height: min(24vh, clamp(68px, calc(54dvh - 302px), 222px));
   }
   .vues-carte { right: 8px; bottom: 128px; width: min(248px, calc(100% - 16px)); }
   .heure-dock {
