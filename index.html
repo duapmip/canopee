@@ -3,123 +3,193 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%239a3f09'/%3E%3C/svg%3E" />
-    <title>Canopée — Paris face à la chaleur</title>
-    <meta
-      name="description"
-      content="Carte des rues ombragées, fontaines et lieux frais à Paris, avec itinéraire piéton et scénario d'adaptation."
-    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%231d1d1f'/%3E%3C/svg%3E" />
+    <title>Canopée</title>
+    <meta name="description" content="Itinéraire à pied à Paris, à l’ombre en été et au soleil en hiver." />
   </head>
   <body>
     <a class="skip" href="#carte">Aller à la carte</a>
-    <div id="carte" role="region" aria-label="Carte de l’ombre et de la canopée à Paris"></div>
+    <div id="carte" role="region" aria-label="Carte de l’ombre à Paris"></div>
 
-    <article id="recit">
-      <header class="intro">
-        <div class="hero-soleil" aria-hidden="true"><span></span></div>
-        <p class="kicker"><span class="marque-feuille" aria-hidden="true">✳</span> CANOPÉE <span class="kicker-sep">/</span> PARIS</p>
-        <h1>La fraîcheur<br />en chemin<span class="titre-point">.</span></h1>
-        <p class="dek">L’ombre, l’eau et les refuges pour traverser Paris à pied.</p>
-      </header>
-
-      <section class="itineraire" aria-labelledby="itineraire-titre">
-        <div class="section-titre"><span class="section-numero">01</span><h2 id="itineraire-titre">Votre trajet à l’ombre</h2></div>
-        <p class="section-sous-titre">Où allez-vous&nbsp;?</p>
-        <form id="form-a" class="adresse-form">
-          <label for="adresse-a">Départ</label>
-          <div class="adresse-ligne"><input id="adresse-a" type="search" placeholder="Adresse de départ à Paris" required autocomplete="street-address" /><button type="submit" aria-label="Chercher le départ">→</button></div>
-          <div id="choix-a" class="choix-adresse" aria-live="polite"></div>
-        </form>
-        <form id="form-b" class="adresse-form">
-          <label for="adresse-b">Destination</label>
-          <div class="adresse-ligne"><input id="adresse-b" type="search" placeholder="Adresse d’arrivée à Paris" required autocomplete="street-address" /><button type="submit" aria-label="Chercher la destination">→</button></div>
-          <div id="choix-b" class="choix-adresse" aria-live="polite"></div>
-        </form>
-        <details class="points-carte">
-          <summary>Ou choisir des points sur la carte</summary>
-          <div class="trajet-actions">
-            <button type="button" id="poser-a" aria-label="Poser A au centre">A</button>
-            <button type="button" id="poser-b" aria-label="Poser B au centre">B</button>
-            <button type="button" id="effacer">Effacer</button>
-          </div>
-        </details>
-        <div class="trajet-synthese">
-          <p class="trajet-resultat" id="trajet-resultat" aria-live="polite">Chargement de Paris…</p>
-          <p class="trajet-contexte" id="trajet-contexte"></p>
+    <aside id="recit">
+      <div class="itineraire">
+        <div class="trajet-groupe">
+          <form id="form-a" class="champ">
+            <span class="point point-a" aria-hidden="true"></span>
+            <label class="sr-only" for="adresse-a">Départ</label>
+            <input id="adresse-a" type="search" placeholder="Départ" required autocomplete="street-address" />
+          </form>
+          <form id="form-b" class="champ">
+            <span class="point point-b" aria-hidden="true"></span>
+            <label class="sr-only" for="adresse-b">Arrivée</label>
+            <input id="adresse-b" type="search" placeholder="Arrivée" required autocomplete="street-address" />
+          </form>
+          <button type="button" id="inverser" aria-label="Inverser le départ et l’arrivée">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path d="M5 2.5v9M5 11.5 3 9.5M5 11.5 7 9.5M11 13.5v-9M11 4.5 9 6.5M11 4.5 13 6.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
-      </section>
-
-      <section class="horizon-section" aria-label="Comparer les horizons">
-        <div class="section-titre"><span class="section-numero">02</span><h2>Explorer deux horizons</h2></div>
-        <div class="horizon" role="group" aria-label="Horizon de la carte">
-          <button type="button" id="vue-aujourdhui" aria-pressed="true"><span>2026</span><small>Aujourd’hui</small></button>
-          <button type="button" id="vue-future" aria-pressed="false"><span>2036</span><small>Scénario</small></button>
+        <div id="choix-a" class="choix-adresse" aria-live="polite"></div>
+        <div id="choix-b" class="choix-adresse" aria-live="polite"></div>
+        <div class="trajet-outils">
+          <button type="button" id="effacer">Effacer</button>
         </div>
-        <p class="vue-explication" id="vue-explication">Ombre des bâtiments calculée et couverture des arbres recensés estimée pour le 25 juin 2026. Fontaines et lieux frais observés.</p>
-      </section>
+        <p class="trajet-resultat" id="trajet-resultat" aria-live="polite">Chargement de Paris…</p>
+        <p class="trajet-contexte" id="trajet-contexte"></p>
+      </div>
 
-      <section class="observatoire" aria-labelledby="observatoire-titre">
-        <div class="section-titre"><span class="section-numero">03</span><h2 id="observatoire-titre">Le constat près des stations</h2></div>
-        <div class="constats" id="constats" aria-live="polite"></div>
-        <details class="stations-lecture">
-          <summary>Voir les stations et leurs données</summary>
-          <p class="methode-courte">Trois points d’attention possibles&nbsp;: moins de 40&nbsp;% d’ombre sur les rues à 250&nbsp;m, fontaine à plus de 350&nbsp;m, lieu frais à plus de 300&nbsp;m. Distances à vol d’oiseau, seuils exploratoires.</p>
-          <label for="chercher-station">Rechercher une station</label>
-          <input id="chercher-station" type="search" placeholder="Nom de station" autocomplete="off" />
-          <p id="stations-compte" class="stations-compte"></p>
-          <ol id="stations-liste" class="stations-liste"></ol>
-          <button type="button" id="stations-toutes" class="stations-toutes">Afficher toutes les stations</button>
-        </details>
-      </section>
-
-      <details class="reglages">
-        <summary>Saison et couches de la carte</summary>
-      <div class="saison" role="group" aria-label="Saison">
+      <div class="segments" role="group" aria-label="Année">
+        <button type="button" id="vue-aujourdhui" aria-pressed="true">2026</button>
+        <button type="button" id="vue-future" aria-pressed="false">2036</button>
+      </div>
+      <div class="segments" role="group" aria-label="Saison">
         <button type="button" id="saison-ete" aria-pressed="true">Été</button>
         <button type="button" id="saison-hiver" aria-pressed="false">Hiver</button>
       </div>
+      <p class="objectif" id="vue-explication">
+        <span class="objectif-icone" id="objectif-icone" aria-hidden="true"></span>
+        <span>
+          <strong id="objectif-but">Le trajet cherche l’ombre.</strong>
+          <span class="suite" id="objectif-suite"></span>
+        </span>
+      </p>
 
-      <fieldset class="couches">
-        <legend>Afficher sur la carte</legend>
-        <label><input id="couche-eau" type="checkbox" checked /> <span class="legende-picto eau" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="#0878ad" stroke="#fff" stroke-width="2"/><g fill="#fff"><rect x="8" y="10" width="13" height="3.2" rx="1.2"/><rect x="19" y="11" width="3" height="4.5" rx="0.8"/><rect x="13.5" y="8" width="2" height="2.5" rx="0.5"/><rect x="11" y="6.8" width="7" height="1.8" rx="0.8"/><path d="M11 20.5h13l-1.5 4h-10z"/></g><circle class="goutte" cx="20.5" cy="17" r="1.5" fill="#b6eeff"/></svg></span> Fontaines à boire</label>
-        <label><input id="couche-frais" type="checkbox" checked /> <span class="legende-picto frais" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="#eaf8f5" stroke="#217464" stroke-width="2"/><path d="M10 16h12 M13 11l6 10 M13 21l6-10" fill="none" stroke="#176c61" stroke-width="2" stroke-linecap="round"/></svg></span> Lieux frais</label>
-        <label><input id="couche-parcs" type="checkbox" checked /> <span class="legende-picto parc" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="#f1f8e9" stroke="#4c872f" stroke-width="2"/><path d="M16 17v8" fill="none" stroke="#6a4b30" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="16" r="4" fill="#397b38"/><circle cx="16" cy="12" r="5" fill="#397b38"/><circle cx="20" cy="16" r="4" fill="#397b38"/></svg></span> Espaces verts ombragés</label>
-        <label><input id="couche-stations" type="checkbox" checked /> <span class="legende-picto station" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="#b34012" stroke="#fff" stroke-width="2"/><rect x="10" y="10" width="12" height="11" rx="2" fill="#fff"/><path d="M12 13h3v3h-3zm5 0h3v3h-3z" fill="#b34012"/><path d="M12 23h8" stroke="#fff" stroke-width="2"/><circle cx="25" cy="7" r="5" fill="#fff" stroke="#b34012"/><text x="25" y="10" text-anchor="middle" font-size="9" font-weight="bold" fill="#b34012">!</text></svg></span> Stations (alerte = plusieurs manques)</label>
-        <p class="zoom-note">Zoomez pour voir les lieux individuels.</p>
-      </fieldset>
-      <p class="phrase">Ombre des bâtiments et canopée estimée en été, ciel dégagé. 41&nbsp;°C ce jour-là à Luxembourg.</p>
-
+      <details class="stations">
+        <summary>
+          <span>Stations</span>
+          <svg class="chevron" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path d="M4 6.5 8 10.5 12 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </summary>
+        <p class="constats" id="constats" aria-live="polite"></p>
+        <label class="sr-only" for="chercher-station">Station</label>
+        <input id="chercher-station" type="search" placeholder="Station" autocomplete="off" />
+        <p id="stations-compte" class="stations-compte"></p>
+        <ol id="stations-liste" class="stations-liste"></ol>
+        <button type="button" id="stations-toutes" class="texte">Toutes les stations</button>
       </details>
-      <button type="button" class="methode-trigger" id="ouvrir-methode">Sources, hypothèses et limites <span aria-hidden="true">↗</span></button>
-    </article>
 
-    <section class="heure-dock" aria-label="Explorer l’ombre selon l’heure">
-      <div class="dock-en-tete"><span class="dock-soleil" aria-hidden="true">✳</span><span>La ville, heure par heure</span></div>
-      <div class="heure-bloc">
-        <div class="heure-ligne">
-          <button type="button" id="precedent" aria-label="Heure précédente">←</button>
-          <p class="heure" id="heure-lue"><span id="heure-nombre">16</span>&nbsp;h</p>
-          <button type="button" id="suivant" aria-label="Heure suivante">→</button>
+      <button type="button" class="texte" id="ouvrir-methode">Sources</button>
+    </aside>
+
+    <div class="vue-carte" role="group" aria-label="Choisir la vue de la carte">
+      <button type="button" id="vue-dessus" aria-pressed="true">Vue du dessus</button>
+      <button type="button" id="vue-inclinee" aria-pressed="false">Vue 3D inclinée</button>
+    </div>
+
+    <section class="heure-dock" aria-label="Heure">
+      <div class="heure-ligne">
+        <button type="button" id="precedent" aria-label="Heure précédente">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="heure-centre">
+          <p class="heure" id="heure-lue"><span id="heure-nombre">16</span> h</p>
+          <button type="button" id="lecture" aria-pressed="false" aria-label="Lire les heures">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5.2 3.2v9.6L13 8z" fill="currentColor"/></svg>
+          </button>
         </div>
-        <label class="range-label" for="heure">Heure</label>
-        <input id="heure" type="range" min="7" max="21" step="1" value="16" />
-        <div class="ticks" aria-hidden="true"><span>7</span><span>12</span><span>16</span><span>21</span></div>
+        <button type="button" id="suivant" aria-label="Heure suivante">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
+      <label class="sr-only" for="heure">Heure</label>
+      <input id="heure" type="range" min="7" max="21" step="1" value="16" />
+      <div class="ticks" aria-hidden="true"><span>7</span><span>12</span><span>16</span><span>21</span></div>
     </section>
 
-    <div class="cle" id="cle" aria-label="Lecture de la couleur des rues">
+    <aside class="cle" id="cle" aria-label="Légende">
       <span class="cle-titre">Lire la carte <small id="lecture-mode">Ombre moyenne des rues par secteur</small></span>
-      <span class="sr-only">Dégradé de la part d’ombre, de 0&nbsp;% au soleil à 100&nbsp;% à l’ombre. Ce n’est pas une température.</span>
-      <span class="degrade" aria-hidden="true"></span>
-      <span class="deg-labels" aria-hidden="true"><span>☀ Exposé</span><span>Ombragé ✳</span></span>
-    </div>
+      <span class="sr-only">Dégradé de la part d’ombre, de 0 % au soleil à 100 % à l’ombre.</span>
+      <span class="degrade" id="degrade" aria-hidden="true"></span>
+      <span class="deg-labels" aria-hidden="true"><span>Exposé</span><span>Ombragé</span></span>
+      <div class="nuancier">
+        <p class="nuancier-titre">Dégradé des rues</p>
+        <div class="presets" role="group" aria-label="Préréglages du dégradé">
+          <button type="button" data-preset="ocre" aria-pressed="false">
+            <span>1 Ocre</span>
+            <span class="barre" style="background: linear-gradient(90deg, #F6E3A1, #E0A04A, #3E4C59)"></span>
+          </button>
+          <button type="button" data-preset="idfm" aria-pressed="false">
+            <span>2 Île-de-France Mobilités</span>
+            <span class="barre" style="background: linear-gradient(90deg, #F4D27A, #5BA3D9, #0055A4)"></span>
+          </button>
+          <button type="button" data-preset="ratp" aria-pressed="false">
+            <span>3 RATP</span>
+            <span class="barre" style="background: linear-gradient(90deg, #F6E7C1, #7BC47F, #00843D)"></span>
+          </button>
+          <button type="button" data-preset="mixte" aria-pressed="false">
+            <span>4 Ocre bleu vert</span>
+            <span class="barre" style="background: linear-gradient(90deg, #F2C14E, #0072CE, #006B3F)"></span>
+          </button>
+        </div>
+        <div class="teintes">
+          <label>Exposé <input id="couleur-expose" type="color" value="#da6840"></label>
+          <label>Ombragé <input id="couleur-ombre" type="color" value="#176778"></label>
+        </div>
+      </div>
+      <ul class="symboles">
+        <li>
+          <label class="symbole">
+            <input id="couche-eau" type="checkbox" checked />
+            <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="#0878ad"/><rect x="4.2" y="5.4" width="7.2" height="1.8" rx="0.6" fill="#fff"/><path d="M5.6 11.2h6.6l-.9 2.2H6.5z" fill="#fff"/></svg>
+            Fontaine
+          </label>
+        </li>
+        <li>
+          <label class="symbole">
+            <input id="couche-frais" type="checkbox" checked />
+            <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6.5" fill="#eaf8f5" stroke="#217464" stroke-width="1.2"/><path d="M4.8 9h8.4M6.4 6.2l5.2 5.6M6.4 11.8l5.2-5.6" fill="none" stroke="#176c61" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Lieu frais
+          </label>
+        </li>
+        <li>
+          <label class="symbole">
+            <input id="couche-parcs" type="checkbox" checked />
+            <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6.5" fill="#f1f8e9" stroke="#4c872f" stroke-width="1.2"/><path d="M9 9.2v4" stroke="#6a4b30" stroke-width="1.3" stroke-linecap="round"/><circle cx="6.8" cy="8.8" r="2" fill="#397b38"/><circle cx="9" cy="6.6" r="2.4" fill="#397b38"/><circle cx="11.2" cy="8.8" r="2" fill="#397b38"/></svg>
+            Parc
+          </label>
+        </li>
+        <li>
+          <label class="symbole">
+            <input id="couche-stations" type="checkbox" checked />
+            <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="#214c83"/><rect x="5.6" y="5.8" width="6.6" height="5.6" rx="1" fill="#fff"/><path d="M6.6 7.2h1.6v1.6H6.6zm3 0h1.6v1.6H9.6z" fill="#214c83"/></svg>
+            Arrêt
+          </label>
+        </li>
+        <li id="legende-alerte">
+          <span class="symbole symbole-fixe">
+            <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="#b34012"/><rect x="5.4" y="6" width="6.2" height="5.2" rx="1" fill="#fff"/><circle cx="13.2" cy="4.6" r="2.3" fill="#fff"/><text x="13.2" y="5.6" text-anchor="middle" font-size="4.2" font-weight="700" fill="#b34012">!</text></svg>
+            Arrêt en alerte
+          </span>
+        </li>
+        <li id="legende-gain" hidden>
+          <span class="symbole symbole-fixe">
+            <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 9h14" stroke="#258251" stroke-width="3" stroke-linecap="round"/></svg>
+            Canopée en plus
+          </span>
+        </li>
+        <li id="legende-manque" hidden>
+          <span class="symbole symbole-fixe">
+            <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="5" fill="#c98d32" opacity="0.85" stroke="#fff" stroke-width="1.2"/></svg>
+            Manque
+          </span>
+        </li>
+        <li id="legende-projet" hidden>
+          <span class="symbole symbole-fixe">
+            <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 9h14" stroke="#744a9b" stroke-width="2" stroke-dasharray="3 2" stroke-linecap="round"/></svg>
+            Projet
+          </span>
+        </li>
+      </ul>
+    </aside>
 
     <p id="direct" class="sr-only" aria-live="polite"></p>
 
     <dialog id="methode">
       <article>
         <header>
-          <h2>Comment c’est calculé</h2>
+          <h2>Sources</h2>
           <button type="button" id="fermer-methode">Fermer</button>
         </header>
         <div id="methode-corps"></div>
