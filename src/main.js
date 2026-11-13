@@ -3,15 +3,15 @@ import "@fontsource/source-sans-3/latin-400.css";
 import "@fontsource/source-sans-3/latin-600.css";
 import "@fontsource/source-sans-3/latin-700.css";
 import * as maplibregl from "maplibre-gl";
-import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { pct } from "./annotations.js";
 import { registerMapIcons } from "./map-icons.js";
 import { createRouter, indexBuildings } from "./router.js";
+import { createPlaceVolumes, VOLUME_ZOOM } from "./place-volumes.js";
+import { shadowOffset } from "./sun.js";
 import "./style.css";
 
 const scene = await fetch("data/scene.json").then((r) => r.json());
 const treeMeta = await fetch("data/tree-cover.json").then((r) => r.json());
-maplibregl.setWorkerUrl(maplibreWorkerUrl);
 const params = new URLSearchParams(location.search);
 let hour = Number(params.get("h"));
 if (!scene.hours.includes(hour)) hour = 16;
@@ -31,6 +31,7 @@ const EMPTY = { type: "FeatureCollection", features: [] };
 let amenities = EMPTY;
 let stationCollection = EMPTY;
 let showAllStations = false;
+let armed = null;
 
 const el = {
   nombre: document.getElementById("heure-nombre"),
@@ -38,6 +39,10 @@ const el = {
   direct: document.getElementById("direct"),
   precedent: document.getElementById("precedent"),
   suivant: document.getElementById("suivant"),
+  lecture: document.getElementById("lecture"),
+  goalIcon: document.getElementById("objectif-icone"),
+  goalText: document.getElementById("objectif-but"),
+  goalExtra: document.getElementById("objectif-suite"),
   methode: document.getElementById("methode"),
   corps: document.getElementById("methode-corps"),
   resultat: document.getElementById("trajet-resultat"),
@@ -57,15 +62,62 @@ const el = {
   stationList: document.getElementById("stations-liste"),
   stationAll: document.getElementById("stations-toutes"),
   mapMode: document.getElementById("lecture-mode"),
+  vueDessus: document.getElementById("vue-dessus"),
+  vueInclinee: document.getElementById("vue-inclinee"),
 };
 
-const SHADE_COLOR = ["interpolate", ["linear"], ["get", "s"], 0, "#da6840", 0.5, "#9f8172", 1, "#176778"];
+const SHADE_PRESETS = {
+  ocre: ["#F6E3A1", "#E0A04A", "#3E4C59"],
+  idfm: ["#F4D27A", "#5BA3D9", "#0055A4"],
+  ratp: ["#F6E7C1", "#7BC47F", "#00843D"],
+  mixte: ["#F2C14E", "#0072CE", "#006B3F"],
+};
+let shadeStops = ["#da6840", "#9f8172", "#176778"];
+let activePreset = null;
+let paintingShade = false;
+
+function shadeExpression(stops) {
+  if (stops.length >= 3) {
+    return ["interpolate", ["linear"], ["get", "s"], 0, stops[0], 0.5, stops[1], 1, stops[2]];
+  }
+  return ["interpolate", ["linear"], ["get", "s"], 0, stops[0], 1, stops[1]];
+}
+
+function applyShade(stops, presetId) {
+  shadeStops = stops.slice();
+  activePreset = presetId;
+  const expression = shadeExpression(stops);
+  for (const [id, prop] of [
+    ["quartiers-ombre", "fill-color"],
+    ["rues-loin", "line-color"],
+    ["rues-pres", "line-color"],
+  ]) {
+    if (map.getLayer(id)) map.setPaintProperty(id, prop, expression);
+  }
+  const bar = document.getElementById("degrade");
+  if (bar) {
+    bar.style.background = stops.length >= 3
+      ? `linear-gradient(90deg, ${stops[0]}, ${stops[1]}, ${stops[2]})`
+      : `linear-gradient(90deg, ${stops[0]}, ${stops[1]})`;
+  }
+  paintingShade = true;
+  const expose = document.getElementById("couleur-expose");
+  const ombre = document.getElementById("couleur-ombre");
+  if (expose) expose.value = stops[0];
+  if (ombre) ombre.value = stops[stops.length - 1];
+  paintingShade = false;
+  for (const button of document.querySelectorAll(".presets button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.preset === presetId));
+  }
+}
+
+const SHADE_COLOR = shadeExpression(shadeStops);
 
 function padding() {
   if (window.innerWidth < 760) {
     return { top: Math.round(window.innerHeight * (window.innerWidth < 500 ? 0.5 : 0.48)), right: 10, bottom: 145, left: 10 };
   }
-  return { top: 24, right: 24, bottom: 160, left: 430 };
+  return { top: 24, right: 24, bottom: 92, left: 348 };
 }
 
 function pointInRing(lon, lat, ring) {
@@ -104,18 +156,42 @@ function step(delta) {
   renderHour(scene.hours[(index + delta + scene.hours.length) % scene.hours.length], true);
 }
 
-function stopPlay() {}
+let playTimer = null;
+const playIcon = `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5.2 3.2v9.6L13 8z" fill="currentColor"/></svg>`;
+const pauseIcon = `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4.6 3.2h2.2v9.6H4.6zM9.2 3.2h2.2v9.6H9.2z" fill="currentColor"/></svg>`;
 
-el.precedent.addEventListener("click", () => step(-1));
-el.suivant.addEventListener("click", () => step(1));
-el.range.addEventListener("input", () => renderHour(Number(el.range.value), true));
+function setPlayIcon(playing) {
+  el.lecture.setAttribute("aria-pressed", String(playing));
+  el.lecture.setAttribute("aria-label", playing ? "Pause" : "Lire les heures");
+  el.lecture.innerHTML = playing ? pauseIcon : playIcon;
+}
+
+function stopPlay() {
+  if (playTimer) clearInterval(playTimer);
+  playTimer = null;
+  setPlayIcon(false);
+}
+
+function startPlay(userGesture) {
+  if (playTimer) return;
+  if (!userGesture && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  setPlayIcon(true);
+  playTimer = setInterval(() => step(1), 1100);
+}
+
+el.lecture.addEventListener("click", () => (playTimer ? stopPlay() : startPlay(true)));
+el.precedent.addEventListener("click", () => { stopPlay(); step(-1); });
+el.suivant.addEventListener("click", () => { stopPlay(); step(1); });
+el.range.addEventListener("input", () => { stopPlay(); renderHour(Number(el.range.value), true); });
 window.addEventListener("keydown", (event) => {
   if (event.target.closest("input, textarea, select, dialog[open] button")) return;
   if (event.key === "ArrowRight") {
     event.preventDefault();
+    stopPlay();
     step(1);
   } else if (event.key === "ArrowLeft") {
     event.preventDefault();
+    stopPlay();
     step(-1);
   }
 });
@@ -132,7 +208,7 @@ const map = new maplibregl.Map({
   pitchWithRotate: true,
   touchPitch: true,
   attributionControl: true,
-  customAttribution: "Ombre : IGN BD TOPO et arbres de Paris · Eau et fraîcheur : Ville de Paris / Eau de Paris · Stations et projets : Île-de-France Mobilités · 41 °C : Météo-France",
+  customAttribution: "Ombre : IGN BD TOPO et arbres de Paris. Eau et fraîcheur : Ville de Paris, Eau de Paris. Stations et projets : Île-de-France Mobilités. 41 °C : Météo-France",
   locale: {
     "NavigationControl.ResetBearing": "Glisser pour tourner, cliquer pour le nord",
     "NavigationControl.ZoomIn": "Zoomer",
@@ -142,6 +218,20 @@ const map = new maplibregl.Map({
 map.touchZoomRotate.enableRotation();
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
+const placeVolumes = createPlaceVolumes(map);
+
+for (const button of document.querySelectorAll(".presets button")) {
+  button.addEventListener("click", () => applyShade(SHADE_PRESETS[button.dataset.preset], button.dataset.preset));
+}
+for (const input of [document.getElementById("couleur-expose"), document.getElementById("couleur-ombre")]) {
+  input.addEventListener("input", () => {
+    if (paintingShade) return;
+    const expose = document.getElementById("couleur-expose").value;
+    const ombre = document.getElementById("couleur-ombre").value;
+    const preset = Object.entries(SHADE_PRESETS).find(([, stops]) => stops[0].toLowerCase() === expose.toLowerCase() && stops[2].toLowerCase() === ombre.toLowerCase());
+    applyShade(preset ? preset[1] : [expose, ombre], preset ? preset[0] : null);
+  });
+}
 
 function calmBasemap() {
   for (const layer of map.getStyle().layers) {
@@ -154,10 +244,144 @@ function calmBasemap() {
 }
 
 function syncVolumes() {
+  if (!map.getLayer("batis-volume")) return;
   const raised = map.getPitch() > 2;
   map.setLayoutProperty("batis-volume", "visibility", raised ? "visible" : "none");
   map.setLayoutProperty("batis-connus", "visibility", raised ? "none" : "visible");
   map.setLayoutProperty("batis-connus-line", "visibility", raised ? "none" : "visible");
+}
+
+function cross(o, a, b) {
+  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}
+
+function convexHull(points) {
+  const sorted = points.slice().sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const unique = [];
+  for (const p of sorted) {
+    const last = unique[unique.length - 1];
+    if (last && last[0] === p[0] && last[1] === p[1]) continue;
+    unique.push(p);
+  }
+  if (unique.length < 3) return null;
+  const lower = [];
+  for (const p of unique) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = unique.length - 1; i >= 0; i--) {
+    const p = unique[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  upper.pop();
+  lower.pop();
+  const ring = lower.concat(upper);
+  if (ring.length < 3) return null;
+  ring.push(ring[0]);
+  return ring;
+}
+
+function exteriorOf(geometry) {
+  if (!geometry) return null;
+  if (geometry.type === "Polygon") return geometry.coordinates[0];
+  if (geometry.type === "MultiPolygon") return geometry.coordinates[0]?.[0] || null;
+  return null;
+}
+
+let shadowCache = { key: "", data: EMPTY };
+let batisKey = "";
+
+function sunNow() {
+  const list = season === "hiver" ? scene.winterSun : scene.sun;
+  return list.find((item) => item.hour === hour) || null;
+}
+
+function buildShadows(collection) {
+  const sun = sunNow();
+  if (!collection || !sun?.up || sun.altitude <= 0.5) return EMPTY;
+  const alt = (sun.altitude * Math.PI) / 180;
+  const az = (sun.azimuth * Math.PI) / 180;
+  const features = [];
+  for (const feature of collection.features) {
+    const h = feature.properties?.h;
+    if (!h) continue;
+    const ring = exteriorOf(feature.geometry);
+    if (!ring || ring.length < 4) continue;
+    const off = shadowOffset(alt, az, h, 180);
+    if (!off) continue;
+    const lat = ring[0][1] * Math.PI / 180;
+    const dLon = off.east / (111320 * Math.cos(lat));
+    const dLat = off.north / 110540;
+    const cloud = [];
+    for (let i = 0; i < ring.length - 1; i++) {
+      const p = ring[i];
+      cloud.push(p, [p[0] + dLon, p[1] + dLat]);
+    }
+    const hull = convexHull(cloud);
+    if (!hull) continue;
+    features.push({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [hull] } });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+function paintBuildings() {
+  if (!buildings || !map.getSource("batis") || !map.getSource("ombres")) return;
+  const raised = map.getPitch() > 2;
+  const zoom = map.getZoom();
+  let data = null;
+  let key = "";
+  if (raised && zoom < 14.8) {
+    data = buildings.cityMesh();
+    key = "ville";
+  } else if (zoom >= 14.8 || raised) {
+    const box = map.getBounds();
+    let west = box.getWest();
+    let south = box.getSouth();
+    let east = box.getEast();
+    let north = box.getNorth();
+    if (raised) {
+      const c = map.getCenter();
+      const span = Math.min(0.28, 0.5 / 2 ** Math.max(0, zoom - 12));
+      west = c.lng - span;
+      east = c.lng + span;
+      south = c.lat - span * 0.7;
+      north = c.lat + span * 0.7;
+    } else {
+      const pad = 0.0012;
+      west -= pad;
+      south -= pad;
+      east += pad;
+      north += pad;
+    }
+    data = buildings.featuresIn(west, south, east, north, raised ? 20000 : 3500);
+    if (!data && raised) {
+      data = buildings.cityMesh();
+      key = "ville";
+    } else if (data) {
+      key = `${west.toFixed(3)}:${south.toFixed(3)}:${east.toFixed(3)}:${north.toFixed(3)}`;
+    }
+  }
+  if (!data) {
+    if (batisKey) {
+      map.getSource("batis").setData(EMPTY);
+      map.getSource("ombres").setData(EMPTY);
+      batisKey = "";
+      shadowCache = { key: "", data: EMPTY };
+    }
+    return;
+  }
+  if (batisKey !== key) {
+    map.getSource("batis").setData(data);
+    batisKey = key;
+  }
+  const shadowKey = `${key}:${season}:${hour}`;
+  if (shadowCache.key !== shadowKey) {
+    shadowCache = { key: shadowKey, data: buildShadows(data) };
+    map.getSource("ombres").setData(shadowCache.data);
+  }
+  syncVolumes();
 }
 
 function paintStreets() {
@@ -180,7 +404,13 @@ function paintStreets() {
     map.setLayoutProperty("rues-loin", "visibility", "none");
     map.setLayoutProperty("gain-loin", "visibility", "none");
     map.setLayoutProperty("gain-pres", "visibility", "none");
-    map.getSource("batis").setData(EMPTY);
+    if (map.getPitch() > 2) paintBuildings();
+    else if (batisKey && map.getSource("batis")) {
+      map.getSource("batis").setData(EMPTY);
+      map.getSource("ombres")?.setData(EMPTY);
+      batisKey = "";
+      shadowCache = { key: "", data: EMPTY };
+    }
     return;
   }
   const ids = zoom >= 15 ? router.edgesIn(map.getBounds()) : null;
@@ -200,15 +430,7 @@ function paintStreets() {
     map.setLayoutProperty("gain-loin", "visibility", view === "future" ? "visible" : "none");
     map.setLayoutProperty("gain-pres", "visibility", "none");
   }
-  if (buildings && zoom >= 15) {
-    const box = map.getBounds();
-    const pad = 0.0012;
-    const data = buildings.featuresIn(box.getWest() - pad, box.getSouth() - pad, box.getEast() + pad, box.getNorth() + pad);
-    if (data) map.getSource("batis").setData(data);
-  } else if (map.getSource("batis")) {
-    map.getSource("batis").setData(EMPTY);
-  }
-  if (map.getLayer("batis-volume")) syncVolumes();
+  paintBuildings();
 }
 
 let resolveReady = () => {};
@@ -222,6 +444,7 @@ map.on("load", () => {
   map.addSource("rues-pres", { type: "geojson", data: EMPTY });
   map.addSource("quartiers", { type: "geojson", data: EMPTY });
   map.addSource("batis", { type: "geojson", data: EMPTY });
+  map.addSource("ombres", { type: "geojson", data: EMPTY });
   map.addSource("trajet", { type: "geojson", data: EMPTY });
   map.addSource("equipements", { type: "geojson", data: EMPTY });
   map.addSource("manques", { type: "geojson", data: EMPTY });
@@ -281,6 +504,12 @@ map.on("load", () => {
       "line-opacity": 0.96,
       "line-width": ["interpolate", ["linear"], ["zoom"], 15, 2.6, 17, 4.4, 18.5, 6.5],
     },
+  });
+  add({
+    id: "ombres-sol",
+    type: "fill",
+    source: "ombres",
+    paint: { "fill-color": "#2a313c", "fill-opacity": 0.38 },
   });
   add({
     id: "batis-connus",
@@ -376,6 +605,7 @@ map.on("load", () => {
     layout: { "line-cap": "round", "line-join": "round" },
     paint: { "line-color": "#fffaf2", "line-width": 12, "line-opacity": 1 },
   });
+  map.addLayer(placeVolumes.layer);
   map.addLayer({
     id: "trajet-couleur",
     type: "line",
@@ -387,8 +617,15 @@ map.on("load", () => {
     },
   });
 
-  map.on("pitch", syncVolumes);
-  map.on("moveend", paintStreets);
+  map.on("pitch", () => {
+    syncVolumes();
+    placeVolumes.sync();
+    syncPlaceIcons();
+    syncAim();
+    if (map.getPitch() > 2 && batisKey !== "ville" && map.getZoom() < 14.8) paintBuildings();
+  });
+  map.on("pitchend", () => { paintStreets(); placeVolumes.sync(); syncPlaceIcons(); });
+  map.on("moveend", () => { paintStreets(); placeVolumes.sync(); syncPlaceIcons(); });
   map.on("click", onMapClick);
   renderHour(hour, false);
 
@@ -410,22 +647,32 @@ map.on("load", () => {
     get("data/gaps.json", "json"),
     get("data/projects.json", "json"),
     get("data/stations.json", "json"),
+    (async () => {
+      const parts = await Promise.all(Array.from({ length: 12 }, (_, i) => get(`data/park-part-${String(i).padStart(2, "0")}.json`, "json")));
+      return {
+        type: "FeatureCollection",
+        source: "ilots-de-fraicheur-espaces-verts-frais",
+        features: parts.flatMap((part) => part.features),
+      };
+    })(),
   ])
-    .then(([axes, treeCover, batis, places, gaps, projects, stationRows]) => {
+    .then(([axes, treeCover, batis, places, gaps, projects, stationRows, parkShapes]) => {
       router = createRouter(axes, (lon, lat) => pointInRing(lon, lat, scene.ring), treeCover);
       buildings = indexBuildings(batis);
       amenities = places;
       stationCollection = stationRows;
+      placeVolumes.setData(places, stationRows);
+      placeVolumes.setShapes(parkShapes);
       map.getSource("equipements").setData(places);
       map.getSource("manques").setData(gaps);
       map.getSource("projets").setData(projects);
       paintStreets();
       syncView();
-      el.resultat.textContent = "Cliquez A, puis B.";
+      note("Touchez la carte.");
       resolveReady();
     })
     .catch((error) => {
-      el.resultat.textContent = "Les données de Paris n’ont pas pu être lues.";
+      note("Les données de Paris n’ont pas pu être lues.");
       console.error(error);
     });
 });
@@ -444,8 +691,8 @@ window.addEventListener("resize", () => {
 
 function borne(letter) {
   const node = document.createElement("div");
-  node.className = "borne";
-  node.textContent = letter;
+  node.className = `borne borne-${letter.toLowerCase()}`;
+  node.setAttribute("aria-label", letter === "A" ? "Départ" : "Arrivée");
   return new maplibregl.Marker({ element: node, anchor: "center" });
 }
 
@@ -465,10 +712,41 @@ function clearLine() {
   map.getSource("trajet")?.setData(EMPTY);
 }
 
-function routeContext(segments) {
+const ICON_EAU = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="#0878ad"/><rect x="4.2" y="5.4" width="7.2" height="1.8" rx="0.6" fill="#fff"/><path d="M5.6 11.2h6.6l-.9 2.2H6.5z" fill="#fff"/></svg>`;
+const ICON_FRAIS = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6.5" fill="#eaf8f5" stroke="#217464" stroke-width="1.2"/><path d="M4.8 9h8.4M6.4 6.2l5.2 5.6M6.4 11.8l5.2-5.6" fill="none" stroke="#176c61" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+const ICON_PARC = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6.5" fill="#f1f8e9" stroke="#4c872f" stroke-width="1.2"/><path d="M9 9.2v4" stroke="#6a4b30" stroke-width="1.3" stroke-linecap="round"/><circle cx="6.8" cy="8.8" r="2" fill="#397b38"/><circle cx="9" cy="6.6" r="2.4" fill="#397b38"/><circle cx="11.2" cy="8.8" r="2" fill="#397b38"/></svg>`;
+const ICON_SOLEIL = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.4" fill="#da6840"/><g fill="none" stroke="#da6840" stroke-width="1.7" stroke-linecap="round"><path d="M12 3.2v2.3M12 18.5V20.8M3.2 12h2.3M18.5 12h2.3M5.8 5.8l1.6 1.6M16.6 16.6l1.6 1.6M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6"/></g></svg>`;
+const ICON_OMBRE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.2c2.4 1.5 4.4 1.2 6.6-.2 2.2-1.4 4.2-1.6 6.6-.1 2.2 1.3 4.1 1.5 6.3.2" fill="none" stroke="#176778" stroke-width="1.6" stroke-linecap="round"/><path d="M7.2 16.2V8.2h3.4v8M10.6 16.2V5.6H16.4v10.6" fill="#176778"/></svg>`;
+const ICON_TEMPS = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6.2" fill="none" stroke="#0071e3" stroke-width="1.6"/><path d="M9 5.6V9l2.4 1.6" fill="none" stroke="#0071e3" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+const ICON_MARCHE = `<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="6" cy="4.2" r="1.3" fill="#258251"/><path d="M7.2 7.2 5.4 9.6l1.8 1.2-1.2 3.6M8.2 7.4l2.2 1.8 1.6-.4M10.4 9.2l1.4 4.8" fill="none" stroke="#258251" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function iconNode(markup) {
+  const holder = document.createElement("span");
+  holder.innerHTML = markup;
+  return holder.firstElementChild;
+}
+
+function statCard(markup, value, unit) {
+  const card = document.createElement("div");
+  card.className = "stat";
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+  const label = document.createElement("span");
+  label.textContent = unit;
+  card.append(iconNode(markup), strong, label);
+  return card;
+}
+
+function note(text) {
+  el.resultat.className = "trajet-resultat";
+  el.resultat.textContent = text;
+}
+
+function routeMeetings(segments) {
   const points = amenities.features || [];
   let water = 0;
   let cool = 0;
+  let parks = 0;
   for (const feature of points) {
     const category = feature.properties.category;
     if (category !== "water" && category !== "cool" && category !== "park") continue;
@@ -482,13 +760,31 @@ function routeContext(segments) {
       const t = Math.max(0, Math.min(1, (x * dx + y * dy) / (dx * dx + dy * dy || 1)));
       return Math.hypot(x - t * dx, y - t * dy) <= 80;
     });
-    if (near && category === "water") water++;
-    if (near && category !== "water") cool++;
+    if (!near) continue;
+    if (category === "water") water++;
+    else if (category === "park") parks++;
+    else cool++;
   }
-  const parts = [`${water} fontaine${water > 1 ? "s" : ""} et ${cool} lieu${cool > 1 ? "x" : ""} frais à moins de 80 m du trajet`];
-  if (selectedStop) parts.push(`passage par ${selectedStop.properties.name}`);
-  if (view === "future" && season === "ete") parts.push("croissance de la canopée simulée sur les arbres jeunes recensés");
-  return parts.join(" · ") + ". Vérifiez les horaires et l’accès sur place.";
+  el.contexte.replaceChildren();
+  if (!water && !cool && !parks) {
+    el.contexte.removeAttribute("aria-label");
+    return "";
+  }
+  const add = (count, markup) => {
+    const n = document.createElement("span");
+    n.textContent = String(count);
+    el.contexte.append(n, iconNode(markup));
+  };
+  if (water) add(water, ICON_EAU);
+  if (cool) add(cool, ICON_FRAIS);
+  if (parks) add(parks, ICON_PARC);
+  const label = [
+    water ? `${water} fontaine${water > 1 ? "s" : ""}` : "",
+    cool ? `${cool} lieu${cool > 1 ? "x" : ""} frais` : "",
+    parks ? `${parks} parc${parks > 1 ? "s" : ""}` : "",
+  ].filter(Boolean).join(", ");
+  el.contexte.setAttribute("aria-label", label);
+  return label;
 }
 
 function stationProfile(feature) {
@@ -501,9 +797,16 @@ function stationProfile(feature) {
   return { feature, shade, score: Number(shadeGap) + Number(waterGap) + Number(coolGap) };
 }
 
+function modeLabel(mode) {
+  const names = { METRO: "Métro", TRAM: "Tram", RER: "RER", TRAIN: "Train", VAL: "Val" };
+  return String(mode || "Arrêt").split(" / ").map((part) => names[part] || part).join(", ");
+}
+
 function stationText(profile) {
-  const p = profile.feature.properties;
-  return `${profile.shade == null ? "Soleil couché" : `${profile.shade} % d’ombre sur les rues à 250 m`} · fontaine à ${p.waterMeters} m · lieu frais à ${p.coolMeters} m`;
+  if (profile.shade == null) return "Soleil couché.";
+  return season === "hiver"
+    ? `${Math.round(100 - profile.shade)} % de soleil autour.`
+    : `${profile.shade} % d’ombre autour.`;
 }
 
 function renderStationList(profiles) {
@@ -515,7 +818,7 @@ function renderStationList(profiles) {
   const visible = query || showAllStations ? matching : matching.slice(0, 10);
   el.stationCount.textContent = query
     ? `${matching.length} station${matching.length > 1 ? "s" : ""} trouvée${matching.length > 1 ? "s" : ""}.`
-    : `Classement à ${hour} h · ${visible.length} station${visible.length > 1 ? "s" : ""} affichée${visible.length > 1 ? "s" : ""} sur ${matching.length}.`;
+    : `${visible.length} sur ${matching.length}, à ${hour} h.`;
   el.stationList.replaceChildren();
   for (const profile of visible) {
     const p = profile.feature.properties;
@@ -524,11 +827,9 @@ function renderStationList(profiles) {
     button.type = "button";
     const name = document.createElement("strong");
     name.textContent = p.name;
-    const score = document.createElement("span");
-    score.textContent = `${p.mode} · ${profile.score} point${profile.score > 1 ? "s" : ""} d’attention sur 3`;
     const details = document.createElement("span");
-    details.textContent = stationText(profile);
-    button.append(name, score, details);
+    details.textContent = `${modeLabel(p.mode)}. ${stationText(profile)}`;
+    button.append(name, details);
     button.addEventListener("click", () => {
       const coords = profile.feature.geometry.coordinates;
       map.flyTo({ center: coords, zoom: 15.4, padding: padding(), duration: 450 });
@@ -544,65 +845,11 @@ function renderStations() {
   if (!stationCollection.features?.length) return;
   const profiles = stationCollection.features.map(stationProfile);
   const lowShade = profiles.filter((p) => p.shade != null && p.shade < 40).length;
-  const combined = profiles.filter((p) => p.score >= 2).length;
   const count = profiles.length;
-  const index = scene.hours.indexOf(hour);
-  const countLow = (key) => stationCollection.features.filter((feature) => {
-    const shade = feature.properties[key][index];
-    return shade != null && shade < 40;
-  }).length;
-  const todayLow = season === "hiver" ? countLow("shadeWinter") : countLow("shadeToday");
-  const futureLow = season === "hiver" ? todayLow : countLow("shadeFuture");
   const day = profiles.some((p) => p.shade != null);
-  const percentage = day ? Math.round((lowShade / count) * 100) : 0;
-  const comparison = season === "hiver"
-    ? "Croissance des arbres non simulée en hiver"
-    : `${Math.max(0, todayLow - futureLow)} station${todayLow - futureLow > 1 ? "s" : ""} passe${todayLow - futureLow > 1 ? "nt" : ""} au-dessus du seuil d’ombre en 2036`;
-  const ring = document.createElement("div");
-  ring.className = "constat-anneau";
-  ring.style.setProperty("--part", `${percentage}%`);
-  ring.innerHTML = `<span>${day ? percentage : "—"}<small>${day ? "%" : ""}</small></span>`;
-  const lead = document.createElement("div");
-  lead.className = "constat-message";
-  const eyebrow = document.createElement("span");
-  eyebrow.className = "constat-eyebrow";
-  eyebrow.textContent = view === "future" ? "SCÉNARIO 2036" : "PARIS AUJOURD’HUI";
-  const value = document.createElement("strong");
-  value.textContent = day ? `${lowShade} stations` : "Soleil couché";
-  const desc = document.createElement("p");
-  desc.textContent = day ? `sur ${count} ont peu d’ombre autour à ${hour} h.` : "L’ombre portée n’est plus mesurée à cette heure.";
-  lead.append(eyebrow, value, desc);
-  const hero = document.createElement("div");
-  hero.className = "constat-hero";
-  hero.append(ring, lead);
-  const bars = document.createElement("div");
-  bars.className = "constat-comparaison";
-  for (const [label, value, selected] of [["Aujourd’hui", todayLow, view === "today"], ["Vers 2036", futureLow, view === "future"]]) {
-    const row = document.createElement("div");
-    row.className = `comparaison-ligne${selected ? " active" : ""}`;
-    const heading = document.createElement("span");
-    heading.textContent = label;
-    const track = document.createElement("span");
-    track.className = "comparaison-piste";
-    const fill = document.createElement("span");
-    fill.style.width = day ? `${(value / count) * 100}%` : "0%";
-    track.append(fill);
-    const amount = document.createElement("strong");
-    amount.textContent = day ? String(value) : "—";
-    row.append(heading, track, amount);
-    bars.append(row);
-  }
-  const note = document.createElement("div");
-  note.className = "constat-note";
-  const gain = document.createElement("span");
-  gain.textContent = day ? comparison : "Comparaison indisponible après le coucher du soleil";
-  const needs = document.createElement("span");
-  needs.textContent = `${combined} stations cumulent au moins 2 manques`;
-  note.append(gain, needs);
-  const method = document.createElement("p");
-  method.className = "constat-seuil";
-  method.textContent = "Peu d’ombre = moins de 40 % des rues ombragées à 250 m. Modèle exploratoire.";
-  el.insights.replaceChildren(hero, bars, note, method);
+  el.insights.textContent = day
+    ? `${lowShade} stations sur ${count} ont moins de 40 % d’ombre à ${hour} h.`
+    : "Soleil couché.";
   renderStationList(profiles);
   if (map.getSource("stations")) {
     map.getSource("stations").setData({
@@ -652,8 +899,8 @@ function drawRoute(speak) {
     clearLine();
     hideBorne("B");
     pointB = null;
-    el.resultat.textContent = result.message;
-    el.contexte.textContent = "";
+    note(result.message);
+    el.contexte.replaceChildren();
     if (speak) el.direct.textContent = result.message;
     return;
   }
@@ -669,81 +916,135 @@ function drawRoute(speak) {
         geometry: { type: "LineString", coordinates: segment.coords },
       })),
   });
-  const length = formatLength(result.length);
+  const meters = Math.round(result.length);
   const minutes = Math.max(1, Math.round(result.length / 75));
-  const time = document.createElement("strong");
-  time.className = "result-time";
-  time.textContent = `${minutes} min`;
-  const details = document.createElement("span");
-  details.className = "result-details";
-  const distance = document.createElement("span");
-  distance.textContent = `${length} à pied`;
-  const shade = document.createElement("span");
-  shade.className = "result-shade";
-  shade.textContent = result.neutral
+  const sunShare = result.neutral ? null : season === "hiver" ? 1 - result.shade : result.shade;
+  const shareLabel = result.neutral
     ? "Soleil couché"
-    : view === "future" && season === "ete"
-      ? `${pct(result.todayShade)} → ${pct(result.shade)} d’ombre`
-      : `${pct(result.shade)} à l’ombre`;
-  details.append(distance, shade);
-  el.resultat.replaceChildren(time, details);
-  el.contexte.textContent = routeContext(result.segments);
-  if (speak) el.direct.textContent = `${minutes} minutes à pied, ${length}. ${shade.textContent}.`;
+    : season === "hiver"
+      ? `${pct(sunShare)} au soleil`
+      : `${pct(sunShare)} à l’ombre`;
+  el.resultat.className = "trajet-cartes";
+  el.resultat.replaceChildren(
+    statCard(ICON_TEMPS, String(minutes), "min"),
+    statCard(ICON_MARCHE, meters.toLocaleString("fr-FR"), "m"),
+    statCard(season === "hiver" ? ICON_SOLEIL : ICON_OMBRE, result.neutral ? "—" : String(Math.round(sunShare * 100)), result.neutral ? "" : "%"),
+  );
+  const meetings = routeMeetings(result.segments);
+  if (speak) el.direct.textContent = `${minutes} minutes, ${formatLength(result.length)}. ${shareLabel}. ${meetings}`.trim();
+}
+
+const streetToken = { a: 0, b: 0 };
+
+function streetName(properties) {
+  const street = properties?.street || properties?.name || "";
+  if (street && !/^\d/.test(street)) return street;
+  const label = properties?.label || "";
+  const fromLabel = label.split(",")[0].replace(/^\d+\s*/, "").trim();
+  return fromLabel || street || "Rue sans nom";
+}
+
+function labelPoint(letter, lon, lat) {
+  const token = ++streetToken[letter];
+  const input = document.getElementById(letter === "a" ? "adresse-a" : "adresse-b");
+  const url = new URL("https://data.geopf.fr/geocodage/reverse");
+  url.searchParams.set("lon", String(lon));
+  url.searchParams.set("lat", String(lat));
+  url.searchParams.set("limit", "1");
+  fetch(url)
+    .then((response) => response.json())
+    .then((data) => {
+      if (streetToken[letter] !== token) return;
+      input.value = streetName(data.features?.[0]?.properties);
+    })
+    .catch(() => {
+      if (streetToken[letter] !== token) return;
+      if (!input.value) input.value = "Rue sans nom";
+    });
 }
 
 function place(lngLat, which) {
   if (!router) {
-    el.resultat.textContent = "Chargement de Paris…";
+    note("Chargement de Paris…");
     return;
   }
   const point = [lngLat.lng ?? lngLat[0], lngLat.lat ?? lngLat[1]];
   const snap = router.snap(point[0], point[1]);
   if (!snap.ok) {
-    if (!(pointA && pointB)) el.resultat.textContent = snap.message;
+    if (!(pointA && pointB)) note(snap.message);
     el.direct.textContent = snap.message;
     return;
   }
-  const target = which || (pointA && !pointB ? "b" : "a");
+  const target = which || armed || (pointA && !pointB ? "b" : "a");
+  armed = null;
   if (target === "b" && !pointA) {
-    el.resultat.textContent = "Posez A d’abord.";
-    el.direct.textContent = "Posez A d’abord.";
+    note("Choisissez d’abord le départ.");
+    el.direct.textContent = "Choisissez d’abord le départ.";
     return;
   }
   if (target === "a") {
     pointA = point;
     pointB = null;
     selectedStop = null;
-    document.getElementById("adresse-a").value = "";
     document.getElementById("adresse-b").value = "";
+    if (!which) labelPoint("a", snap.lon, snap.lat);
     clearLine();
     hideBorne("B");
     showBorne("A", [snap.lon, snap.lat]);
-    el.resultat.textContent = "A est posé. Choisissez B.";
-    el.contexte.textContent = "";
-    el.direct.textContent = "Point A posé. Choisissez B.";
+    note("Départ posé.");
+    el.contexte.replaceChildren();
+    el.direct.textContent = "Départ posé. Choisissez l’arrivée.";
     return;
   }
   pointB = point;
-  document.getElementById("adresse-b").value = "";
+  if (!which) labelPoint("b", snap.lon, snap.lat);
   drawRoute(true);
+}
+
+function syncAim() {
+  const tilted = map.getPitch() > 2;
+  el.vueDessus.setAttribute("aria-pressed", String(!tilted));
+  el.vueInclinee.setAttribute("aria-pressed", String(tilted));
+}
+
+function aimView(tilted) {
+  map.easeTo({ pitch: tilted ? 60 : 0, bearing: 0, duration: 650 });
+}
+
+function syncPlaceIcons() {
+  const volumesOn = map.getPitch() > 2 && map.getZoom() >= VOLUME_ZOOM;
+  for (const [id, visible] of [
+    ["points-eau", el.water.checked && !volumesOn],
+    ["lieux-frais", el.cool.checked && !volumesOn],
+    ["parcs-frais", el.parks.checked && !volumesOn],
+    ["stations-points", el.stations.checked && !volumesOn],
+  ]) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+  }
 }
 
 function syncView() {
   el.today.setAttribute("aria-pressed", String(view === "today"));
   el.future.setAttribute("aria-pressed", String(view === "future"));
-  el.explanation.textContent =
-    view === "today"
-      ? season === "ete"
-        ? "Rues et arbres actuels · fontaines et lieux frais recensés."
-        : "Soleil d’hiver · ombre des bâtiments seulement."
-      : season === "ete"
-        ? "Arbres jeunes plus grands · eau et refuges inchangés. Scénario, pas prévision."
-        : "L’ombre reste celle des bâtiments en hiver. Scénario, pas prévision.";
+  const winter = season === "hiver";
+  el.goalIcon.replaceChildren(iconNode(winter ? ICON_SOLEIL : ICON_OMBRE));
+  el.goalText.textContent = winter ? "Le trajet cherche le soleil." : "Le trajet cherche l’ombre.";
+  el.goalExtra.textContent = view === "today"
+    ? ""
+    : winter
+      ? "L’ombre reste celle des bâtiments."
+      : "Les jeunes arbres sont plus grands.";
   for (const [id, visible] of [
-    ["points-eau", el.water.checked],
-    ["lieux-frais", el.cool.checked],
-    ["parcs-frais", el.parks.checked],
-    ["stations-points", el.stations.checked],
+    ["legende-gain", view === "future" && season === "ete"],
+    ["legende-manque", view === "future"],
+    ["legende-projet", view === "future"],
+    ["legende-alerte", el.stations.checked],
+  ]) {
+    const row = document.getElementById(id);
+    if (row) row.hidden = !visible;
+  }
+  syncPlaceIcons();
+  for (const [id, visible] of [
     ["manques", view === "future"],
     ["projets", view === "future"],
   ]) {
@@ -751,7 +1052,52 @@ function syncView() {
   }
   paintStreets();
   renderStations();
+  placeVolumes.setVisible({
+    water: el.water.checked,
+    cool: el.cool.checked,
+    park: el.parks.checked,
+    station: el.stations.checked,
+  });
   if (pointA && pointB) drawRoute(false);
+}
+
+function placeTitle(value) {
+  if (!value) return "";
+  return value.toLocaleLowerCase("fr-FR").replace(/(^|[\s'-])(\p{L})/gu, (_, sep, letter) => sep + letter.toLocaleUpperCase("fr-FR"));
+}
+
+function openFiche(lngLat, nom, type, info, action) {
+  const box = document.createElement("div");
+  box.className = "fiche-corps";
+  const title = document.createElement("strong");
+  title.className = "fiche-nom";
+  title.textContent = nom || "Lieu";
+  const kind = document.createElement("p");
+  kind.className = "fiche-type";
+  kind.textContent = type;
+  box.append(title, kind);
+  if (info) {
+    const line = document.createElement("p");
+    line.className = "fiche-info";
+    line.textContent = info;
+    box.append(line);
+  }
+  const popup = new maplibregl.Popup({ closeButton: true, maxWidth: "240px", className: "fiche", offset: 16 })
+    .setLngLat(lngLat)
+    .setDOMContent(box)
+    .addTo(map);
+  if (action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "fiche-action";
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      action.run();
+      popup.remove();
+    });
+    box.append(button);
+  }
+  return popup;
 }
 
 function showStationPopup(feature, lngLat, suppliedProfile) {
@@ -761,35 +1107,22 @@ function showStationPopup(feature, lngLat, suppliedProfile) {
     shade: p.shade == null || p.shade === "null" ? null : Number(p.shade),
     score: Number(p.score),
   };
-  const box = document.createElement("div");
-  const name = document.createElement("strong");
-  name.textContent = p.name;
-  const details = document.createElement("p");
-  details.textContent = `${p.mode} · ${profile.score} point${profile.score > 1 ? "s" : ""} d’attention sur 3. ${stationText(profile)}.`;
-  const note = document.createElement("p");
-  note.textContent = "Point représentatif de la station, pas une entrée. Distances à vol d’oiseau.";
-  box.append(name, details, note);
-  if (pointA && router?.snap(lngLat[0], lngLat[1]).ok) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "Itinéraire depuis le départ";
-    button.addEventListener("click", () => {
-      pointB = lngLat;
-      selectedStop = null;
-      document.getElementById("adresse-b").value = `${p.name} (station)`;
-      drawRoute(true);
-      const bounds = new maplibregl.LngLatBounds();
-      bounds.extend(pointA);
-      bounds.extend(pointB);
-      map.fitBounds(bounds, { padding: padding(), maxZoom: 16, duration: 450 });
-      mapPopup.remove();
-    });
-    box.append(button);
-  }
-  const mapPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "290px" })
-    .setLngLat(lngLat)
-    .setDOMContent(box)
-    .addTo(map);
+  const point = Array.isArray(lngLat) ? lngLat : [lngLat.lng, lngLat.lat];
+  openFiche(point, p.name, modeLabel(p.mode), stationText(profile), pointA && router?.snap(point[0], point[1]).ok
+    ? {
+        label: "Itinéraire",
+        run() {
+          pointB = point;
+          selectedStop = null;
+          document.getElementById("adresse-b").value = p.name;
+          drawRoute(true);
+          const bounds = new maplibregl.LngLatBounds();
+          bounds.extend(pointA);
+          bounds.extend(pointB);
+          map.fitBounds(bounds, { padding: padding(), maxZoom: 16, duration: 450 });
+        },
+      }
+    : null);
 }
 
 function popup(feature, lngLat) {
@@ -797,48 +1130,39 @@ function popup(feature, lngLat) {
     showStationPopup(feature, feature.geometry.coordinates);
     return;
   }
-  const box = document.createElement("div");
-  const title = document.createElement("strong");
-  title.textContent = feature.properties.name || "Information";
-  box.append(title);
-  const info = document.createElement("p");
   const p = feature.properties;
   const isTrue = (value) => value === true || value === "true";
-  info.textContent = [p.kind, p.address, p.year ? `mise en service estimée : ${p.year}` : "", p.status].filter(Boolean).join(" · ");
-  if (info.textContent) box.append(info);
-  if (p.category === "cool" || p.category === "park") {
-    const note = document.createElement("p");
-    note.textContent = p.category === "park"
-      ? "Végétation haute : " + Math.round((p.canopy || 0) * 100) + " %. Entrées et horaires à vérifier."
-      : isTrue(p.free) ? "Accès déclaré gratuit. Horaires à vérifier." : "Accès et horaires à vérifier.";
-    box.append(note);
+  let nom = p.name || "Lieu";
+  let type = "Lieu";
+  let info = "";
+  if (p.category === "water") {
+    nom = placeTitle(p.address) || p.name;
+    type = "Fontaine";
+    info = p.name && p.name !== nom ? p.name : "";
+  } else if (p.category === "park") {
+    type = "Parc";
+    info = p.canopy == null ? "" : `${Math.round(Number(p.canopy) * 100)} % de végétation haute`;
+  } else if (p.category === "cool") {
+    type = p.kind || "Lieu frais";
+    info = isTrue(p.free) ? "Accès gratuit." : placeTitle(p.address);
+  } else if (isTrue(p.waterGap) || isTrue(p.refugeGap)) {
+    nom = "Secteur éloigné";
+    type = "Manque";
+    info = isTrue(p.waterGap) ? `Fontaine à ${p.nearestWater} m.` : `Lieu frais à ${p.nearestRefuge} m.`;
+  } else if (p.year || p.status) {
+    type = "Projet";
+    info = [p.status, p.year].filter(Boolean).join(", ");
   }
-  if (isTrue(p.waterGap) || isTrue(p.refugeGap)) {
-    info.textContent = [
-      isTrue(p.waterGap) ? `fontaine à ${p.nearestWater} m` : "",
-      isTrue(p.refugeGap) ? `refuge à ${p.nearestRefuge} m` : "",
-    ].filter(Boolean).join(" · ");
-    if (!info.parentElement) box.append(info);
-  }
-  if (p.category === "water" || (p.category === "cool" && isTrue(p.free))) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "Passer par ce lieu";
-    button.addEventListener("click", () => {
-      if (!pointA || !pointB) {
-        el.resultat.textContent = "Choisissez d’abord un départ et une arrivée.";
-        return;
+  const canStop = p.category === "water" || (p.category === "cool" && isTrue(p.free));
+  openFiche(lngLat, nom, type, info, canStop && pointA && pointB
+    ? {
+        label: "Étape",
+        run() {
+          selectedStop = feature;
+          drawRoute(true);
+        },
       }
-      selectedStop = feature;
-      drawRoute(true);
-      mapPopup.remove();
-    });
-    box.append(button);
-  }
-  const mapPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "260px" })
-    .setLngLat(lngLat)
-    .setDOMContent(box)
-    .addTo(map);
+    : null);
 }
 
 function onMapClick(event) {
@@ -911,6 +1235,8 @@ for (const letter of ["a", "b"]) {
     searchAddress(letter);
   });
 }
+el.vueDessus.addEventListener("click", () => aimView(false));
+el.vueInclinee.addEventListener("click", () => aimView(true));
 el.today.addEventListener("click", () => { view = "today"; syncView(); });
 el.future.addEventListener("click", () => { view = "future"; syncView(); });
 for (const input of [el.water, el.cool, el.parks, el.stations]) input.addEventListener("change", syncView);
@@ -925,12 +1251,30 @@ function setSeason(next) {
 
 el.ete.addEventListener("click", () => setSeason("ete"));
 el.hiver.addEventListener("click", () => setSeason("hiver"));
-document.getElementById("poser-a").addEventListener("click", () => place(map.getCenter(), "a"));
-document.getElementById("poser-b").addEventListener("click", () => place(map.getCenter(), "b"));
+document.getElementById("inverser").addEventListener("click", () => {
+  const champA = document.getElementById("adresse-a");
+  const champB = document.getElementById("adresse-b");
+  [champA.value, champB.value] = [champB.value, champA.value];
+  document.getElementById("choix-a").replaceChildren();
+  document.getElementById("choix-b").replaceChildren();
+  [pointA, pointB] = [pointB, pointA];
+  selectedStop = null;
+  if (pointA) showBorne("A", pointA);
+  else hideBorne("A");
+  if (pointB) showBorne("B", pointB);
+  else hideBorne("B");
+  if (pointA && pointB) drawRoute(true);
+  else {
+    clearLine();
+    note(pointA ? "Départ posé." : "Touchez la carte.");
+    el.contexte.replaceChildren();
+  }
+});
 document.getElementById("effacer").addEventListener("click", () => {
   pointA = null;
   pointB = null;
   selectedStop = null;
+  armed = null;
   for (const letter of ["a", "b"]) {
     document.getElementById(`adresse-${letter}`).value = "";
     document.getElementById(`choix-${letter}`).replaceChildren();
@@ -938,8 +1282,8 @@ document.getElementById("effacer").addEventListener("click", () => {
   clearLine();
   hideBorne("A");
   hideBorne("B");
-  el.resultat.textContent = "Cliquez A, puis B.";
-  el.contexte.textContent = "";
+  note("Touchez la carte.");
+  el.contexte.replaceChildren();
   el.direct.textContent = "Trajet effacé.";
 });
 
@@ -951,6 +1295,9 @@ if (params.has("test")) {
     place: (lon, lat, which) => place([lon, lat], which),
     season: setSeason,
     hour: (h) => renderHour(h, false),
+    shade: () => shadeStops.slice(),
+    preset: () => activePreset,
+    volumes: () => placeVolumes.count(),
     ready,
   };
 }
