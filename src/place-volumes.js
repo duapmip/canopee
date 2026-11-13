@@ -477,7 +477,7 @@ export function createPlaceVolumes(map) {
         }
         gl.vertexAttrib4f(2, 1, 0, 0, 0);
         gl.vertexAttrib4f(3, 0, 1, 0, 0);
-        gl.vertexAttrib4f(4, 0, 0, 1. 0);
+        gl.vertexAttrib4f(4, 0, 0, 1, 0);
         gl.vertexAttrib4f(5, 0, 0, 0, 1);
         gl.uniform1f(this.grain, 0.16);
         gl.drawArrays(gl.TRIANGLES, 0, groundCount);
