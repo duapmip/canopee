@@ -3,6 +3,7 @@ import "@fontsource/source-sans-3/latin-400.css";
 import "@fontsource/source-sans-3/latin-600.css";
 import "@fontsource/source-sans-3/latin-700.css";
 import * as maplibregl from "maplibre-gl";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { pct } from "./annotations.js";
 import { registerMapIcons } from "./map-icons.js";
 import { createLiveShade } from "./live-shade.js";
@@ -13,6 +14,7 @@ import "./style.css";
 
 const scene = await fetch("data/scene.json").then((r) => r.json());
 const treeMeta = await fetch("data/tree-cover.json").then((r) => r.json());
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 const params = new URLSearchParams(location.search);
 let hour = Number(params.get("h"));
 if (!scene.hours.includes(hour)) hour = 16;
@@ -846,6 +848,7 @@ map.on("load", () => {
       paintStreets();
       syncView();
       note("Touchez la carte.");
+      openStorySelection();
       resolveReady();
     })
     .catch((error) => {
@@ -1676,6 +1679,40 @@ function setSeason(next) {
   renderHour(hour, Boolean(pointA && pointB));
   syncView();
 }
+
+// Restore a concrete example or station selected on the separate data story.
+function openStorySelection() {
+  if (params.get("season") === "hiver") setSeason("hiver");
+  const parsePoint = (key) => {
+    const parts = params.get(key)?.split(",");
+    if (!parts || parts.length !== 2 || parts.some((p) => !p.trim())) return null;
+    const p = parts.map(Number);
+    return p.every(Number.isFinite) && pointInRing(p[0], p[1], scene.ring) ? p : null;
+  };
+  const a = parsePoint("a"), b = parsePoint("b");
+  if (a && b) {
+    accept = params.get("accept") === "100" || (!params.has("accept") && season === "hiver") ? 100 : 0;
+    for (const button of document.querySelectorAll("#soleil-crans button")) {
+      button.setAttribute("aria-pressed", String(Number(button.dataset.accept) === accept));
+    }
+    renderCopy();
+    place(a, "a");
+    place(b, "b");
+    document.getElementById("adresse-a").value = "Départ de l’exemple";
+    document.getElementById("adresse-b").value = "Station de l’exemple";
+    const bounds = new maplibregl.LngLatBounds(a, a).extend(b);
+    const route = routePlan(...a, ...b);
+    if (route.ok) for (const segment of route.segments) for (const point of segment.coords) bounds.extend(point);
+    map.fitBounds(bounds, { padding: padding(), maxZoom: 16, duration: 0 });
+    return;
+  }
+  const station = stationCollection.features.find((f) => f.properties.id === params.get("station"));
+  if (station) {
+    map.jumpTo({ center: station.geometry.coordinates, zoom: 15.4, padding: padding() });
+    showStationPopup(station, station.geometry.coordinates, stationProfile(station));
+  }
+}
+
 
 el.ete.addEventListener("click", () => setSeason("ete"));
 el.hiver.addEventListener("click", () => setSeason("hiver"));
