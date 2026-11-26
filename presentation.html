@@ -92,13 +92,17 @@
         </div>
       </section>
 
-      <section class="slide resources-slide" id="ressources" data-chapter="Ressources" aria-labelledby="resources-title">
+      <section class="slide" id="demain" data-chapter="Le scénario 2036" aria-labelledby="future-title">
         <div class="slide-layout">
-          <div class="slide-copy"><h2 id="resources-title">Ressources</h2></div>
-          <ul class="resource-list">
-            <li><a href="https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-quotidiennes" target="_blank" rel="noopener">Températures quotidiennes · Météo-France</a><small>Paris-Montsouris, station 75114001 · Licence Ouverte 2.0</small><a class="data-link" href="./data/paris-montsouris-tx.csv" download>Télécharger les relevés utilisés (CSV)</a></li>
-            <li><a href="./dataviz#sources" target="_blank" rel="noopener">Données et méthode de Canopée</a><small>IGN · Île-de-France Mobilités · Ville de Paris · Eau de Paris</small></li>
-          </ul>
+          <div class="slide-copy">
+            <h2 id="future-title">Plus d’ombre<br /><em>en 2036&nbsp;?</em></h2>
+            <p class="lead">Si la couronne des jeunes arbres gagnait 2 m de rayon, <strong>{{futureLow}} stations</strong> resteraient sous 40 % d’ombre à 16 h, contre {{lowShade}} aujourd’hui.</p>
+          </div>
+          <figure class="chart-panel future-panel">
+            <figcaption><h3>Les stations dans le scénario 2036</h3><p>Chaque point représente une des {{stationCount}} stations.</p></figcaption>
+            <svg class="dot-grid" viewBox="0 0 393 134" role="img" aria-label="Répartition des stations selon leur ombre actuelle et simulée en 2036">{{dots}}</svg>
+            <ul class="dot-key"><li><i class="dot-low"></i><strong>{{futureLow}}</strong> resteraient sous le seuil</li><li><i class="dot-change"></i><strong>{{moved}}</strong> atteindraient ou franchiraient 40 %</li><li><i class="dot-above"></i><strong>{{above}}</strong> ont déjà au moins 40 % d’ombre</li></ul>
+          </figure>
         </div>
       </section>
 
@@ -149,20 +153,6 @@
         </div>
       </section>
 
-      <section class="slide" id="demain" data-chapter="Les suites" aria-labelledby="future-title">
-        <div class="slide-layout">
-          <div class="slide-copy">
-            <h2 id="future-title">Plus d’ombre<br /><em>en 2036&nbsp;?</em></h2>
-            <p class="lead">Si la couronne des jeunes arbres gagnait 2 m de rayon, <strong>{{futureLow}} stations</strong> resteraient sous 40 % d’ombre à 16 h, contre {{lowShade}} aujourd’hui.</p>
-          </div>
-          <figure class="chart-panel future-panel">
-            <figcaption><h3>Les stations dans le scénario 2036</h3><p>Chaque point représente une des {{stationCount}} stations.</p></figcaption>
-            <svg class="dot-grid" viewBox="0 0 393 134" role="img" aria-label="Répartition des stations selon leur ombre actuelle et simulée en 2036">{{dots}}</svg>
-            <ul class="dot-key"><li><i class="dot-low"></i><strong>{{futureLow}}</strong> resteraient sous le seuil</li><li><i class="dot-change"></i><strong>{{moved}}</strong> atteindraient ou franchiraient 40 %</li><li><i class="dot-above"></i><strong>{{above}}</strong> ont déjà au moins 40 % d’ombre</li></ul>
-          </figure>
-        </div>
-      </section>
-
       <section class="slide closing-slide" id="questions" data-chapter="Pistes d’action" aria-labelledby="end-title">
         <div class="slide-layout">
           <h2 id="end-title">À 35&nbsp;°C, que changer <em>autour de votre station&nbsp;?</em></h2>
@@ -181,6 +171,16 @@
             </li>
           </ul>
           <div class="end-actions"><a class="action" href="./dataviz" target="_blank" rel="noopener">Lire la dataviz</a><a class="text-action" href="./index.html" target="_blank" rel="noopener">Ouvrir la carte</a></div>
+        </div>
+      </section>
+
+      <section class="slide resources-slide" id="ressources" data-chapter="Ressources" aria-labelledby="resources-title">
+        <div class="slide-layout">
+          <div class="slide-copy"><h2 id="resources-title">Ressources</h2></div>
+          <ul class="resource-list">
+            <li><a href="https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-quotidiennes" target="_blank" rel="noopener">Températures quotidiennes · Météo-France</a><small>Paris-Montsouris, station 75114001 · Licence Ouverte 2.0</small><a class="data-link" href="./data/paris-montsouris-tx.csv" download>Télécharger les relevés utilisés (CSV)</a></li>
+            <li><a href="./dataviz#sources" target="_blank" rel="noopener">Données et méthode de Canopée</a><small>IGN · Île-de-France Mobilités · Ville de Paris · Eau de Paris</small></li>
+          </ul>
         </div>
       </section>
       <article class="speaker-panel" id="speaker-panel" aria-label="Notes orateur" hidden>
@@ -205,8 +205,10 @@
         <p>Lire le nuage de points. Plus on va à droite, plus les rues sont au soleil. Plus on monte, plus le pôle a enregistré de validations en 2025. Une même personne peut valider plusieurs fois.</p>
         <p>Prendre la gare de Lyon en exemple. Les rues y ont {{gareShade}} % d’ombre et la fontaine recensée la plus proche se trouve à {{gareWater}} m à vol d’oiseau. Un trajet à pied peut être plus long.</p>
       </div>
-      <div data-for="ressources">
-        <p>Le CSV donne la température maximale de chaque journée à Paris-Montsouris. Les méthodes, les licences et les autres jeux de données sont accessibles depuis le récit.</p>
+      <div data-for="demain">
+        <p>Nous faisons une seule hypothèse pour 2036. La couronne des jeunes arbres déjà recensés gagne deux mètres de rayon. Le bâti est conservé et aucune nouvelle plantation n’est ajoutée.</p>
+        <p>À 16 h, on passerait de {{lowShade}} à {{futureLow}} stations sous le seuil de 40 % d’ombre. Seulement {{moved}} stations atteindraient ou franchiraient ce seuil dans ce scénario.</p>
+        <p>Comment arrive-t-on à ces chiffres, rue par rue&nbsp;? Prenons le quartier de République pour montrer comment on estime l’ombre.</p>
       </div>
       <div data-for="methode">
         <p>Dans la vue 3D de République, repérer un immeuble et son ombre au sol. À partir du tracé des rues, de la hauteur des bâtiments et de la position du soleil, on estime la longueur de rue à l’ombre à chaque heure.</p>
@@ -221,18 +223,16 @@
       <div data-for="demo">
         <p>Ouvrir « Essayer ce trajet » depuis la fenêtre projetée. Le départ, la station, l’été et 16 h sont déjà sélectionnés. Montrer le tracé, les points d’eau et le réglage de l’heure.</p>
         <p>Passer de la recherche d’ombre au chemin le plus court. On peut aussi chercher du soleil en hiver ou utiliser la carte à vélo. Les durées de l’outil utilisent une vitesse de 5 km/h à pied.</p>
-        <p>Revenir à l’onglet de présentation et poser la question aux aménageurs. Que gagnerait-on si les arbres grandissaient&nbsp;?</p>
-      </div>
-      <div data-for="demain">
-        <p>Nous faisons une seule hypothèse pour 2036. La couronne des jeunes arbres déjà recensés gagne deux mètres de rayon. Le bâti est conservé et aucune nouvelle plantation n’est ajoutée.</p>
-        <p>À 16 h, on passerait de {{lowShade}} à {{futureLow}} stations sous le seuil de 40 % d’ombre. Seulement {{moved}} stations atteindraient ou franchiraient ce seuil dans ce scénario.</p>
-        <p>Revenir aux personnes qui marchent jusqu’au métro ou attendent leur bus. Si les arbres actuels ne suffisent pas à ombrager leur trajet, sur quoi peut-on agir&nbsp;?</p>
+        <p>Revenir à l’onglet de présentation. On vient de choisir un trajet plus ombragé. Que pourrait-on aménager pour que les autres trajets soient eux aussi plus confortables&nbsp;?</p>
       </div>
       <div data-for="questions">
         <p>Imaginez le trajet que vous faites jusqu’à votre station les jours de forte chaleur. Canopée peut vous aider à choisir une rue plus ombragée. Que pourrait-on changer dans le quartier lui-même&nbsp;?</p>
         <p>Première piste, planter là où les piétons et les cyclistes restent longtemps au soleil. Deuxième piste, rendre les fontaines d’eau potable visibles depuis le trajet. Si on ignore qu’une fontaine se trouve dans la rue voisine, on passe à côté.</p>
         <p>Troisième piste, regarder où tombe l’ombre quand les voyageurs attendent. Sur les Champs-Élysées, par exemple, on pourrait comparer les deux côtés de l’avenue à plusieurs heures et saisons avant de choisir un emplacement pour un arrêt de bus ou un accès au métro.</p>
         <p>Ouvrir la discussion avec le public. « Autour de votre station, par quoi commenceriez-vous&nbsp;? » Si quelqu’un propose une station, ouvrir la carte pour regarder ensemble.</p>
+      </div>
+      <div data-for="ressources">
+        <p>Le CSV donne la température maximale de chaque journée à Paris-Montsouris. Les méthodes, les licences et les autres jeux de données sont accessibles depuis le récit.</p>
       </div>
     </template>
 
