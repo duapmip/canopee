@@ -92,6 +92,16 @@
         </div>
       </section>
 
+      <section class="slide resources-slide" id="ressources" data-chapter="Ressources" aria-labelledby="resources-title">
+        <div class="slide-layout">
+          <div class="slide-copy"><h2 id="resources-title">Ressources</h2></div>
+          <ul class="resource-list">
+            <li><a href="https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-quotidiennes" target="_blank" rel="noopener">Températures quotidiennes · Météo-France</a><small>Paris-Montsouris, station 75114001 · Licence Ouverte 2.0</small><a class="data-link" href="./data/paris-montsouris-tx.csv" download>Télécharger les relevés utilisés (CSV)</a></li>
+            <li><a href="./dataviz#sources" target="_blank" rel="noopener">Données et méthode de Canopée</a><small>IGN · Île-de-France Mobilités · Ville de Paris · Eau de Paris</small></li>
+          </ul>
+        </div>
+      </section>
+
       <section class="slide method-slide" id="methode" data-chapter="La méthode" aria-labelledby="method-title">
         <div class="slide-layout">
           <div class="slide-copy">
@@ -173,15 +183,6 @@
           <div class="end-actions"><a class="action" href="./dataviz" target="_blank" rel="noopener">Lire la dataviz</a><a class="text-action" href="./index.html" target="_blank" rel="noopener">Ouvrir la carte</a></div>
         </div>
       </section>
-      <section class="slide resources-slide" id="ressources" data-chapter="Ressources" aria-labelledby="resources-title">
-        <div class="slide-layout">
-          <div class="slide-copy"><h2 id="resources-title">Ressources</h2></div>
-          <ul class="resource-list">
-            <li><a href="https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-quotidiennes" target="_blank" rel="noopener">Températures quotidiennes · Météo-France</a><small>Paris-Montsouris, station 75114001 · Licence Ouverte 2.0</small><a class="data-link" href="./data/paris-montsouris-tx.csv" download>Télécharger les relevés utilisés (CSV)</a></li>
-            <li><a href="./dataviz#sources" target="_blank" rel="noopener">Données et méthode de Canopée</a><small>IGN · Île-de-France Mobilités · Ville de Paris · Eau de Paris</small></li>
-          </ul>
-        </div>
-      </section>
       <article class="speaker-panel" id="speaker-panel" aria-label="Notes orateur" hidden>
         <div class="speaker-script"><h1 id="speaker-title"></h1><div id="speaker-notes"></div></div>
         <div class="speaker-tools"><p id="speaker-next"></p><button id="all-notes-toggle" type="button">Toutes les notes</button></div>
@@ -203,6 +204,9 @@
         <p>À 16 h, {{lowShade}} des {{stationCount}} stations étudiées ont moins de 40 % d’ombre sur la longueur des rues à 250 m alentour. Ce seuil sert à repérer les secteurs à regarder de plus près.</p>
         <p>Lire le nuage de points. Plus on va à droite, plus les rues sont au soleil. Plus on monte, plus le pôle a enregistré de validations en 2025. Une même personne peut valider plusieurs fois.</p>
         <p>Prendre la gare de Lyon en exemple. Les rues y ont {{gareShade}} % d’ombre et la fontaine recensée la plus proche se trouve à {{gareWater}} m à vol d’oiseau. Un trajet à pied peut être plus long.</p>
+      </div>
+      <div data-for="ressources">
+        <p>Le CSV donne la température maximale de chaque journée à Paris-Montsouris. Les méthodes, les licences et les autres jeux de données sont accessibles depuis le récit.</p>
       </div>
       <div data-for="methode">
         <p>Dans la vue 3D de République, repérer un immeuble et son ombre au sol. À partir du tracé des rues, de la hauteur des bâtiments et de la position du soleil, on estime la longueur de rue à l’ombre à chaque heure.</p>
@@ -229,9 +233,6 @@
         <p>Première piste, planter là où les piétons et les cyclistes restent longtemps au soleil. Deuxième piste, rendre les fontaines d’eau potable visibles depuis le trajet. Si on ignore qu’une fontaine se trouve dans la rue voisine, on passe à côté.</p>
         <p>Troisième piste, regarder où tombe l’ombre quand les voyageurs attendent. Sur les Champs-Élysées, par exemple, on pourrait comparer les deux côtés de l’avenue à plusieurs heures et saisons avant de choisir un emplacement pour un arrêt de bus ou un accès au métro.</p>
         <p>Ouvrir la discussion avec le public. « Autour de votre station, par quoi commenceriez-vous&nbsp;? » Si quelqu’un propose une station, ouvrir la carte pour regarder ensemble.</p>
-      </div>
-      <div data-for="ressources">
-        <p>Utiliser cette annexe si quelqu’un souhaite vérifier un chiffre. Le CSV donne la température maximale de chaque journée à Paris-Montsouris. Les méthodes, les licences et les autres jeux de données sont accessibles depuis le récit.</p>
       </div>
     </template>
 

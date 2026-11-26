@@ -4,7 +4,7 @@ Datavisualisation interactive pour le défi « mobilités et adaptation climatiq
 
 ## Présentation du projet
 
-Le [diaporama du hackathon](https://canopee-delta.vercel.app/presentation) présente le projet en huit diapositives suivies d’une annexe de ressources. « Notes orateur » ouvre une seconde fenêtre synchronisée qui contient le texte à dire pour chaque diapositive. On peut aussi y consulter toutes les notes sans déplacer l’écran projeté. « Plein écran » (F) lance la présentation et les flèches changent de diapositive.
+Le [diaporama du hackathon](https://canopee-delta.vercel.app/presentation) présente le projet en neuf diapositives. Les ressources précèdent la méthode. « Notes orateur » ouvre une seconde fenêtre synchronisée qui contient le texte à dire pour chaque diapositive. On peut aussi y consulter toutes les notes sans déplacer l’écran projeté. « Plein écran » (F) lance la présentation et les flèches changent de diapositive.
 
 Le graphique des fortes chaleurs utilise les maximales quotidiennes (TX) de Paris-Montsouris, station 75114001. Le [CSV utilisé](public/data/paris-montsouris-tx.csv) contient tous les jours du 1er janvier 2022 au 24 novembre 2026, avec une TX présente et un indicateur QTX de 1. Le décompte annuel retient strictement TX > 35 °C. Les deux fichiers départementaux du [jeu quotidien de Météo-France](https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-quotidiennes) couvrent [1950–2024](https://www.data.gouv.fr/api/1/datasets/r/27bf7b0f-62a8-438f-acf4-b5f58d293322) et [2025–2026](https://www.data.gouv.fr/api/1/datasets/r/aba837dc-fc7c-4010-ab5e-0eb02feb0010), sous Licence Ouverte 2.0.
 
