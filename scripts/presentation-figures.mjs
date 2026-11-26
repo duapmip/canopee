@@ -100,19 +100,6 @@ function stationDots(groups) {
   return dots.join("");
 }
 
-function stationHours(data) {
-  const hours = [9, 12, 16, 19];
-  const rows = ["République", "Gare de Lyon", "Bastille"].map(name => {
-    const station = data.stations.find(s => s.name === name);
-    const cells = hours.map(hour => {
-      const shade = station.shadeToday[data.hours.indexOf(hour)];
-      return `<td style="background:${shadeColor(shade / 100)};color:${shade >= 76 ? "#fff" : "#020a12"}">${shade}<small> %</small></td>`;
-    });
-    return `<tr><th scope="row">${escape(station.name)}</th>${cells.join("")}</tr>`;
-  });
-  return `<thead><tr><td></td>${hours.map(hour => `<th scope="col">${hour} h</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody>`;
-}
-
 // Render the pitch from the published story at build time. A projector only
 // needs the finished page and its images, including for the interactive atlas.
 export async function renderPresentation(html) {
@@ -140,7 +127,6 @@ export async function renderPresentation(html) {
     routeUrl: "./index.html?" + escape(params.toString()),
     futureLow: frame.futureLowShade, moved, above,
     dots: stationDots([[frame.futureLowShade, "low"], [moved, "change"], [above, "above"]]),
-    stationHours: stationHours(data),
   };
   return html.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     if (!Object.hasOwn(values, key)) throw new Error("Champ de présentation inconnu : " + key);

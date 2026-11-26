@@ -25,6 +25,7 @@ function notes(slide) {
   return byId("oral").content.querySelector(`[data-for="${slide.id}"]`).cloneNode(true);
 }
 if (speakerMode) {
+  document.body.classList.add("speaker-mode");
   document.title = "Notes orateur — Canopée";
   document.querySelector(".deck-brand > span").textContent = "Vue orateur";
   byId("speaker-panel").hidden = false;

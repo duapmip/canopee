@@ -29,7 +29,7 @@ button:disabled { cursor: default; }
 a, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 :focus-visible { outline: 3px solid #2289d5; outline-offset: 4px; }
 .sr-only, .icon-library { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-button svg, .action svg, .text-action svg {
+button svg {
   width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8;
   stroke-linecap: round; stroke-linejoin: round; flex: none;
 }
@@ -68,8 +68,8 @@ h1 em, h2 em { font-style: normal; color: var(--blue); }
 .hero-stat { display: flex; align-items: baseline; flex-wrap: wrap; gap: .14em; margin-top: clamp(20px, 3.2vh, 40px); color: var(--blue); font-size: clamp(78px, calc(var(--unit) * 8.2), 145px); font-weight: 600; line-height: .84; letter-spacing: -.065em; }
 .hero-stat small { color: var(--ink); font-size: .31em; letter-spacing: -.035em; }
 
-.atlas-plate, .hours-panel { color: #fff; background: var(--navy); border-radius: 18px; overflow: hidden; }
 .atlas-plate {
+  color: #fff; background-color: var(--navy); border-radius: 18px; overflow: hidden;
   background-image: linear-gradient(#a9cce414 1px, transparent 1px), linear-gradient(90deg, #a9cce414 1px, transparent 1px);
   background-size: clamp(30px, 3.4vw, 62px) clamp(30px, 3.4vw, 62px);
   background-position: center center;
@@ -93,8 +93,7 @@ body:not(.deck-ready) .hour-switch { display: none; }
 .hour-switch button { padding: 6px clamp(7px, .85vw, 17px); border: 0; border-radius: 5px; font-weight: 600; font-size: clamp(13px, 1.1vw, 18px); background: transparent; color: #e0e9f0; white-space: nowrap; }
 .hour-switch button:hover { background: #28435c; }
 .hour-switch button[aria-pressed=true] { color: var(--ink); background: var(--sun); }
-.chart-panel, .hours-panel { padding: clamp(22px, calc(var(--unit) * 2.65), 49px); border-radius: 18px; }
-.chart-panel { background: white; border: 1px solid var(--rule); }
+.chart-panel { padding: clamp(22px, calc(var(--unit) * 2.65), 49px); border-radius: 18px; background: white; border: 1px solid var(--rule); }
 figcaption h3 { font-size: clamp(23px, calc(var(--unit) * 2.25), 40px); line-height: 1.08; letter-spacing: -.035em; font-weight: 600; }
 figcaption h3 + p { margin-top: 6px; color: var(--muted); font-size: clamp(14px, 1.18vw, 21px); }
 .heat-rows { display: grid; gap: clamp(12px, 2.5vh, 27px); margin-top: clamp(20px, 3.3vh, 40px); }
@@ -145,9 +144,8 @@ figcaption h3 + p { margin-top: 6px; color: var(--muted); font-size: clamp(14px,
 .tool-shot:hover { outline: 2px solid var(--blue); outline-offset: 2px; }
 .action, .text-action { font-size: clamp(16px, 1.24vw, 22px); text-decoration: none; }
 .action { min-height: 45px; padding: .7em 1.05em; background: var(--ink); color: white; border-radius: 9px; }
-.slide-copy > .action, .end-actions { margin-top: clamp(24px, 4vh, 48px); }
-.end-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 24px; }
-.action svg, .text-action svg { width: 1em; height: 1em; }
+.slide-copy > .action { margin-top: clamp(24px, 4vh, 48px); }
+.end-actions { grid-area: links; display: flex; align-items: center; flex-wrap: wrap; gap: 16px 24px; }
 .dot-grid { width: 100%; margin: clamp(22px, 3.4vh, 40px) auto; }
 .dot-low { fill: var(--sun); background: var(--sun); }
 .dot-change { fill: white; stroke: var(--blue); stroke-width: 2; background: white; }
@@ -156,15 +154,14 @@ figcaption h3 + p { margin-top: 6px; color: var(--muted); font-size: clamp(14px,
 .dot-key li { display: flex; align-items: baseline; gap: 8px; }
 .dot-key i { flex: none; width: .7em; height: .7em; border-radius: 50%; }
 .dot-key i.dot-change { border: 2px solid var(--blue); }
-.closing-slide h2 { font-size: clamp(55px, calc(var(--unit) * 6), 110px); }
-.hours-panel figcaption p, .hours-panel > p { color: #c5d8e7; }
-.hours-panel table { width: 100%; margin: clamp(18px, 3.9vh, 42px) 0; border-spacing: 5px 7px; font-variant-numeric: tabular-nums; }
-.hours-panel th { font-size: clamp(14px, 1.25vw, 23px); line-height: 1.1; text-align: left; font-weight: 600; }
-.hours-panel thead th { text-align: center; color: #c5d8e7; font-weight: 400; }
-.hours-panel th:first-child { width: 32%; }
-.hours-panel tbody td { height: clamp(38px, 5.5vh, 70px); width: 17%; border-radius: 4px; text-align: center; font-size: clamp(18px, 1.65vw, 28px); line-height: 1; font-weight: 600; }
-.hours-panel td small { font-size: .66em; }
-.hours-panel > p { font-size: clamp(13px, 1.05vw, 18px); }
+.closing-slide .slide-layout { grid-template-areas: "question options" "links options"; align-items: start; row-gap: clamp(20px, 3.8vh, 44px); }
+.closing-slide h2 { grid-area: question; align-self: end; font-size: clamp(44px, calc(var(--unit) * 5.05), 90px); }
+.adaptation-list { grid-area: options; align-self: center; list-style: none; padding: 0; }
+.adaptation-list li { display: flex; gap: clamp(10px, 1.2vw, 22px); align-items: start; padding-block: clamp(14px, 2.6vh, 28px); }
+.adaptation-list li + li { border-top: 1px solid var(--rule); }
+.adaptation-list img { flex: none; width: clamp(36px, 4vw, 64px); height: auto; }
+.adaptation-list h3 { font-size: clamp(21px, calc(var(--unit) * 2.35), 38px); line-height: 1.12; font-weight: 600; letter-spacing: -.025em; }
+.adaptation-list p { font-size: clamp(16px, calc(var(--unit) * 1.55), 26px); line-height: 1.3; color: var(--muted); margin-top: 5px; }
 .resource-list { list-style: none; padding: 0; }
 .resource-list li { padding-block: clamp(14px, 3vh, 32px); border-bottom: 1px solid var(--rule); }
 .resource-list a { color: var(--blue); font-size: clamp(20px, 1.8vw, 30px); font-weight: 600; }
@@ -202,6 +199,8 @@ figcaption h3 + p { margin-top: 6px; color: var(--muted); font-size: clamp(14px,
 .is-presenting.controls-idle .deck-control:not(:focus-within) { opacity: 0; }
 .is-presenting .deck-control:hover { opacity: 1; }
 .is-presenting { background: var(--paper); }
+.is-presenting:not(.speaker-mode) .speaker-toggle { display: none; }
+@media (display-mode: fullscreen) { body:not(.speaker-mode) .speaker-toggle { display: none; } }
 .deck-stage:focus { outline: none; }
 .deck-ready .slide:not([hidden]) .slide-layout { animation: appear .23s ease-out; }
 @keyframes appear { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -224,6 +223,7 @@ dialog::backdrop { background: #08152666; }
   .screen-toggle { font-size: 13px; padding: 6px 10px; min-height: 35px; }
   .slide { align-items: start; padding-block: 27px; }
   .slide-layout, .demo-slide .slide-layout { grid-template-columns: minmax(0, 1fr); gap: 25px; }
+  .closing-slide .slide-layout { grid-template-areas: "question" "options" "links"; gap: 14px; }
   h1 { font-size: clamp(44px, 10vw, 66px); }
   .slide h2, .closing-slide h2 { font-size: clamp(38px, 8.4vw, 58px); }
   .lead { font-size: 19px; margin-top: 14px; }
@@ -240,9 +240,9 @@ dialog::backdrop { background: #08152666; }
   .atlas-legend strong { font-size: 13px; }
   .atlas-legend > span { font-size: 10px; gap: 4px; }
   .hour-switch button { padding: 7px; }
-  .chart-panel, .hours-panel { padding: 20px; }
+  .chart-panel { padding: 20px; }
   .method-list { margin-top: 16px; gap: 10px; }
-  .map-image, .tool-shot, .atlas-plate, .chart-panel, .hours-panel { border-radius: 12px; }
+  .map-image, .tool-shot, .atlas-plate, .chart-panel { border-radius: 12px; }
   .progress { display: none; }
   .contents-toggle, .counter { font-size: 14px; }
   .arrow { width: 36px; height: 36px; }
@@ -264,14 +264,16 @@ dialog::backdrop { background: #08152666; }
   .slide-layout, .demo-slide .slide-layout { gap: 24px; }
   h1, .slide h2, .closing-slide h2 { font-size: 34px; }
   .lead, .supporting { font-size: 15px; margin-top: 10px; }
-  .byline, .method-list, .walking-bars, .end-actions, .slide-copy > .action { margin-top: 12px; }
+  .byline, .method-list, .walking-bars, .slide-copy > .action { margin-top: 12px; }
   .byline img { width: 60px; }
   .byline p, .method-list p, .chart-key, .dot-key { font-size: 12px; }
   .hero-stat { margin-top: 12px; font-size: 55px; }
-  .chart-panel, .hours-panel { padding: 12px 16px; }
+  .chart-panel { padding: 12px 16px; }
   figcaption h3 { font-size: 20px; }
   figcaption h3 + p, .map-figure figcaption span, .x-axis { font-size: 12px; }
-  .hours-panel table { margin: 12px 0; }
+  .adaptation-list li { padding-block: 8px; }
+  .adaptation-list h3 { font-size: 18px; }
+  .adaptation-list p { font-size: 14px; }
   .scatter { max-height: 34vh; margin-top: 4px; }
   .dot-grid { max-height: 26vh; margin-block: 10px; }
   .station-callout, .map-figure figcaption:not(.chart-key) { margin-top: 6px; gap: 3px 8px; }
@@ -280,7 +282,6 @@ dialog::backdrop { background: #08152666; }
   .walk-label { font-size: 14px; }
   .walk-row small { font-size: 12px; }
   .walk-track { margin-top: 3px; height: 7px; }
-  .hours-panel tbody td { height: 30px; }
   .method-list, .walking-bars { gap: 9px; }
   .map-image, .tool-shot { max-height: 49vh; width: auto; max-width: 100%; margin-inline: auto; object-fit: contain; }
   .tool-shot { aspect-ratio: 1830 / 1215; }
