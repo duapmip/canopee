@@ -2,5 +2,8 @@
   "framework": "vite",
   "outputDirectory": "dist",
   "trailingSlash": false,
-  "rewrites": [{ "source": "/dataviz", "destination": "/recit.html" }]
+  "rewrites": [
+    { "source": "/dataviz", "destination": "/recit.html" },
+    { "source": "/presentation", "destination": "/presentation.html" }
+  ]
 }
