@@ -1,6 +1,7 @@
 import "./story-hex.css";
 
 import { shadeColor } from "./story-palette.js";
+import { createAtlasPath } from "./story-atlas-geometry.js";
 const percent = value => Math.round(value).toLocaleString("fr-FR") + " %";
 
 export function createHexAtlas(data, motion) {
@@ -8,22 +9,7 @@ export function createHexAtlas(data, motion) {
   const svg = $("atlas");
   const panel = svg.closest("figure");
   const ns = "http://www.w3.org/2000/svg";
-  const points = [...data.ring, ...data.cells.flatMap(cell => cell.ring)];
-  const west = Math.min(...points.map(p => p[0]));
-  const east = Math.max(...points.map(p => p[0]));
-  const south = Math.min(...points.map(p => p[1]));
-  const north = Math.max(...points.map(p => p[1]));
-  const cosLat = Math.cos(48.86 * Math.PI / 180);
-  const dx = (east - west) * cosLat, dy = north - south;
-  const scale = Math.min(530 / dx, 370 / dy);
-  const project = ([lon, lat]) => [
-    (550 - dx * scale) / 2 + (lon - west) * cosLat * scale,
-    32 + (370 - dy * scale) / 2 + (north - lat) * scale,
-  ];
-  const pathData = ring => ring.map((point, index) => {
-    const [x, y] = project(point);
-    return (index ? "L" : "M") + x.toFixed(2) + "," + y.toFixed(2);
-  }).join(" ") + " Z";
+  const pathData = createAtlasPath(data);
   function element(name, attributes, text) {
     const node = document.createElementNS(ns, name);
     for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);

@@ -115,8 +115,10 @@
   .tool-preview { height: 360px; }
 }
 @media(max-width: 500px) {
-  .site-header .brand-logo { width: 136px; }
-  .nav-tool { font-size: 14px; padding: 10px 12px; }
+  .site-header { padding-inline: 14px; gap: 8px; }
+  .site-header .brand-logo { width: clamp(88px, 25vw, 126px); }
+  .site-header nav { gap: 9px; }
+  .nav-tool { font-size: 14px; padding: 10px 9px; white-space: nowrap; }
   .nav-tool span { margin-left: 4px; }
   .hero h1 { font-size: 44px; letter-spacing: -1.5px; }
   .hero-question { font-size: 20px; }

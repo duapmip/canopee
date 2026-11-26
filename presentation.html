@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f5f3" />
+    <meta name="description" content="Le pitch de Canopée pour le Hackathon Mobilités 2026. À Paris, que change l’ombre sur le chemin du métro ?" />
+    <link rel="icon" href="./canopee-icon.png" />
+    <link rel="stylesheet" href="./src/presentation.css" />
+    <title>Présentation du projet — Canopée</title>
+  </head>
+  <body>
+    <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <symbol id="expand" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></symbol>
+      <symbol id="collapse" viewBox="0 0 24 24"><path d="M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5"/></symbol>
+      <symbol id="previous" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7"/></symbol>
+      <symbol id="next" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></symbol>
+      <symbol id="contents" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><rect x="14.5" y="14.5" width="6" height="6" rx="1"/></symbol>
+      <symbol id="out" viewBox="0 0 24 24"><path d="M5 19 19 5M6 5h13v13"/></symbol>
+      <symbol id="close" viewBox="0 0 24 24"><path d="m5 5 14 14M5 19 19 5"/></symbol>
+    </svg>
+    <header class="deck-header">
+      <div class="deck-brand">
+        <a href="./dataviz" aria-label="Canopée, le récit en données"><img src="./media/canopee-logo.svg" alt="Canopée" width="148" height="37" /></a>
+        <span>Présentation</span>
+      </div>
+      <div class="header-actions deck-control">
+      <a class="speaker-toggle" id="speaker-toggle" href="./presentation?orateur=1" target="_blank" hidden>Notes orateur</a>
+      <button class="screen-toggle" id="screen-toggle" type="button" aria-pressed="false" title="Plein écran (F)" hidden>
+        <svg aria-hidden="true"><use href="#expand"/></svg><span>Plein écran</span>
+      </button>
+      </div>
+    </header>
+
+    <main id="deck" class="deck-stage" aria-label="Présentation du projet Canopée">
+      <section class="slide cover-slide" id="ouverture" data-chapter="Ouverture" aria-labelledby="cover-title">
+        <div class="slide-layout">
+          <div class="slide-copy cover-copy">
+            <h1 id="cover-title">Mobilités douces,<br /><em>ville plus chaude.</em></h1>
+            <p class="lead">À Paris, peut-on rejoindre le métro en marchant à l’ombre&nbsp;?</p>
+            <div class="byline">
+              <img src="./media/presentation/hackathon-mobilites.webp" width="112" height="60" alt="Hackathon Mobilités 2026, Spécial Dataviz’" />
+              <p>Maxime Pimpaud<br />Adrien Bourdin</p>
+            </div>
+          </div>
+          <figure class="atlas-plate">
+            <div class="atlas-top"><span>Paris au fil du soleil</span><span>25 juin 2026</span></div>
+            <div class="atlas-canvas">
+              <svg class="atlas-map" viewBox="0 71 550 294" role="img" aria-labelledby="atlas-title" aria-describedby="atlas-reading">
+                <title id="atlas-title">Ombre des rues de Paris par secteur</title>
+                {{atlas}}
+              </svg>
+              <span class="north" aria-label="Nord en haut">N<i></i></span>
+            </div>
+            <p class="atlas-reading" id="atlas-reading">{{atlasSummary}}</p>
+            <figcaption class="atlas-bottom">
+              <div class="atlas-legend"><strong>Ombre des rues</strong><span>0 % <i></i> 100 %</span></div>
+              <div class="hour-switch" role="group" aria-label="Heure de la carte">{{hours}}</div>
+              <noscript>16 h</noscript>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="slide" id="climat" data-chapter="Le climat" aria-labelledby="climate-title">
+        <div class="slide-layout">
+          <div class="slide-copy">
+            <h2 id="climate-title">Paris au-dessus<br />de <em>35 °C.</em></h2>
+            <p class="hero-stat">{{heatCount}} <small>jours en {{heatYear}}</small></p>
+            <p class="lead">À Paris-Montsouris, du 1er janvier au {{heatThrough}}. Le 25 juin, journée de notre carte, le maximum a atteint <strong>{{mapMaximum}} °C.</strong></p>
+          </div>
+          <figure class="chart-panel climate-panel">
+            <figcaption><h3>Combien de jours au-dessus de 35 °C&nbsp;?</h3><p>Maximum quotidien mesuré à Paris-Montsouris</p></figcaption>
+            <div class="heat-rows">{{heatRows}}</div>
+          </figure>
+        </div>
+      </section>
+
+      <section class="slide" id="stations" data-chapter="Les stations" aria-labelledby="stations-title">
+        <div class="slide-layout">
+          <div class="slide-copy">
+            <h2 id="stations-title">Où manque-t-on<br />d’ombre&nbsp;?</h2>
+            <p class="hero-stat">{{lowShade}} <small>sur {{stationCount}}</small></p>
+            <p class="lead">À 16 h, ces stations ont moins de 40 % d’ombre sur les rues dans un rayon de 250 m.</p>
+            <p class="supporting">Côté eau, {{distantWater}} des {{stationCount}} stations sont à plus de 250 m d’une fontaine à vol d’oiseau.</p>
+          </div>
+          <figure class="chart-panel traffic-panel">
+            <figcaption><h3>Fréquentation et exposition</h3><p>Validations par pôle en 2025, en millions</p></figcaption>
+            <svg class="scatter" viewBox="0 0 535 242" role="img" aria-label="Fréquentation et part des rues au soleil. Autour de la gare de Lyon, {{gareSun}} % des rues sont au soleil.">{{scatter}}</svg>
+            <p class="x-axis">Part des rues au soleil à 16 h</p>
+            <div class="station-callout"><strong>Gare de Lyon</strong><span>{{gareShade}} % d’ombre · fontaine à {{gareWater}} m à vol d’oiseau</span></div>
+          </figure>
+        </div>
+      </section>
+
+      <section class="slide method-slide" id="methode" data-chapter="La méthode" aria-labelledby="method-title">
+        <div class="slide-layout">
+          <div class="slide-copy">
+            <h2 id="method-title">Comment estimer<br />l’ombre d’une rue&nbsp;?</h2>
+            <ol class="method-list">
+              <li><strong>Reconstituer les rues et les bâtiments</strong></li>
+              <li><strong>Calculer l’ombre heure par heure</strong></li>
+              <li><strong>Comparer les chemins vers la station</strong></li>
+            </ol>
+          </div>
+          <figure class="map-figure">
+            <img class="map-image" src="./media/presentation/quartier-3d.webp" width="1744" height="1299" alt="Vue 3D du quartier de République. Les volumes des bâtiments bordent des rues colorées du jaune au bleu selon leur ombre." />
+            <figcaption><strong>République en 3D, 16 h</strong></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="slide" id="trajet" data-chapter="Le trajet" aria-labelledby="route-title">
+        <div class="slide-layout">
+          <div class="slide-copy">
+            <h2 id="route-title">De République<br />à <em>Arts et Métiers.</em></h2>
+            <p class="lead">À 16 h, {{detour}} minutes de marche en plus permettent de <strong>réduire de moitié le temps au soleil.</strong></p>
+            <div class="walking-bars" aria-label="Durée et exposition des deux trajets">{{walkBars}}</div>
+          </div>
+          <figure class="map-figure route-figure">
+            <img class="map-image" src="./media/presentation/itineraire.webp" width="1027" height="720" alt="Le trajet le plus court suit la diagonale. Le chemin qui cherche l’ombre emprunte les rues situées plus au nord." />
+            <figcaption class="chart-key"><span><i class="route-dash"></i>Le plus court</span><span><i class="route-solid"></i>En cherchant l’ombre</span></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="slide demo-slide" id="demo" data-chapter="La démo" aria-labelledby="demo-title">
+        <div class="slide-layout">
+          <div class="slide-copy">
+            <h2 id="demo-title">À chacun son<br /><em>chemin.</em></h2>
+            <p class="lead">L’été, cherchez l’ombre. L’hiver, privilégiez le soleil. Entre deux adresses, Canopée indique le chemin à pied, à vélo ou en Vélib’ et les points d’eau en route.</p>
+            <a class="action" href="{{routeUrl}}" target="_blank" rel="noopener">Essayer ce trajet<svg aria-hidden="true"><use href="#out"/></svg></a>
+          </div>
+          <figure class="map-figure tool-figure">
+            <a class="tool-shot" href="{{routeUrl}}" target="_blank" rel="noopener" aria-label="Ouvrir le trajet République – Arts et Métiers dans la carte Canopée (nouvel onglet)">
+              <img src="./media/presentation/carte.webp" width="1830" height="1215" alt="Interface de Canopée. Le panneau de trajet affiche la durée, la distance et la part de soleil, à côté du parcours sur la carte." />
+            </a>
+            <figcaption><strong>République → Arts et Métiers</strong></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="slide" id="demain" data-chapter="Les suites" aria-labelledby="future-title">
+        <div class="slide-layout">
+          <div class="slide-copy">
+            <h2 id="future-title">Plus d’ombre<br /><em>en 2036&nbsp;?</em></h2>
+            <p class="lead">Si la couronne des jeunes arbres gagnait 2 m de rayon, <strong>{{futureLow}} stations</strong> resteraient sous 40 % d’ombre à 16 h, contre {{lowShade}} aujourd’hui.</p>
+            <p class="supporting">Les aménageurs peuvent planter le long des rues exposées, mieux signaler les fontaines et choisir des accès ombragés aux heures de passage.</p>
+          </div>
+          <figure class="chart-panel future-panel">
+            <figcaption><h3>Les stations dans le scénario 2036</h3><p>Chaque point représente une des {{stationCount}} stations.</p></figcaption>
+            <svg class="dot-grid" viewBox="0 0 393 134" role="img" aria-label="Répartition des stations selon leur ombre actuelle et simulée en 2036">{{dots}}</svg>
+            <ul class="dot-key"><li><i class="dot-low"></i><strong>{{futureLow}}</strong> resteraient sous le seuil</li><li><i class="dot-change"></i><strong>{{moved}}</strong> atteindraient ou franchiraient 40 %</li><li><i class="dot-above"></i><strong>{{above}}</strong> ont déjà au moins 40 % d’ombre</li></ul>
+          </figure>
+        </div>
+      </section>
+
+      <section class="slide closing-slide" id="questions" data-chapter="Questions" aria-labelledby="end-title">
+        <div class="slide-layout">
+          <div class="slide-copy">
+            <h2 id="end-title">Et votre station,<br /><em>à 16 h&nbsp;?</em></h2>
+            <div class="end-actions"><a class="action" href="./dataviz" target="_blank" rel="noopener">Lire la dataviz<svg aria-hidden="true"><use href="#out"/></svg></a><a class="text-action" href="./index.html" target="_blank" rel="noopener">Ouvrir la carte<svg aria-hidden="true"><use href="#out"/></svg></a></div>
+            <div class="byline">
+              <img src="./media/presentation/hackathon-mobilites.webp" width="112" height="60" alt="Hackathon Mobilités 2026, Spécial Dataviz’" />
+              <p>Maxime Pimpaud<br />Adrien Bourdin</p>
+            </div>
+          </div>
+          <figure class="hours-panel">
+            <figcaption><h3>L’ombre au fil des heures</h3><p>Part d’ombre des rues dans un rayon de 250 m</p></figcaption>
+            <table aria-label="Part d’ombre des rues autour de trois stations le 25 juin 2026">{{stationHours}}</table>
+            <p>Trois exemples parisiens · 25 juin 2026</p>
+          </figure>
+        </div>
+      </section>
+      <section class="slide resources-slide" id="ressources" data-chapter="Ressources" aria-labelledby="resources-title">
+        <div class="slide-layout">
+          <div class="slide-copy"><h2 id="resources-title">Ressources</h2></div>
+          <ul class="resource-list">
+            <li><a href="https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-quotidiennes" target="_blank" rel="noopener">Températures quotidiennes · Météo-France</a><small>Paris-Montsouris, station 75114001 · Licence Ouverte 2.0</small><a class="data-link" href="./data/paris-montsouris-tx.csv" download>Télécharger les relevés utilisés (CSV)</a></li>
+            <li><a href="./dataviz#sources" target="_blank" rel="noopener">Données et méthode de Canopée</a><small>IGN · Île-de-France Mobilités · Ville de Paris · Eau de Paris</small></li>
+          </ul>
+        </div>
+      </section>
+      <article class="speaker-panel" id="speaker-panel" aria-label="Notes orateur" hidden>
+        <div class="speaker-script"><h1 id="speaker-title"></h1><div id="speaker-notes"></div></div>
+        <div class="speaker-tools"><p id="speaker-next"></p><button id="all-notes-toggle" type="button">Toutes les notes</button></div>
+      </article>
+    </main>
+
+    <template id="oral">
+      <div data-for="ouverture">
+        <p>On connaît la distance jusqu’au métro. Par une journée très chaude, on aimerait aussi savoir combien de temps on va marcher au soleil. C’est le point de départ de Canopée.</p>
+        <p>Montrer Paris à 14 h, puis revenir à 16 h. Chaque hexagone résume l’ombre des rues de son secteur. Le jaune indique les rues les plus exposées et le bleu les plus ombragées.</p>
+        <p>Nous avons choisi Paris comme terrain pilote pour aider à la fois les voyageurs qui cherchent un chemin et les collectivités qui aménagent les accès aux transports.</p>
+      </div>
+      <div data-for="climat">
+        <p>À la station Paris-Montsouris, nous avons compté {{heatCount}} journées dont la maximale a strictement dépassé 35 °C entre le 1er janvier et le {{heatThrough}} {{heatYear}}. Une journée à exactement 35 °C est exclue du décompte.</p>
+        <p>Le graphique montre des années contrastées. On compte cinq journées en 2025 et deux en 2024. Le chiffre d’environ un jour par an qu’on trouve dans les projections correspond à la moyenne de référence 1976–2005.</p>
+        <p>Revenir au 25 juin 2026. La station a mesuré {{mapMaximum}} °C au plus chaud de la journée. Notre carte montre comment l’ombre se déplaçait dans les rues ce jour-là.</p>
+      </div>
+      <div data-for="stations">
+        <p>À 16 h, {{lowShade}} des {{stationCount}} stations étudiées ont moins de 40 % d’ombre sur la longueur des rues à 250 m alentour. Ce seuil sert à repérer les secteurs à regarder de plus près.</p>
+        <p>Lire le nuage de points. Plus on va à droite, plus les rues sont au soleil. Plus on monte, plus le pôle a enregistré de validations en 2025. Une même personne peut valider plusieurs fois.</p>
+        <p>Prendre la gare de Lyon en exemple. Les rues y ont {{gareShade}} % d’ombre et la fontaine recensée la plus proche se trouve à {{gareWater}} m à vol d’oiseau. Un trajet à pied peut être plus long.</p>
+      </div>
+      <div data-for="methode">
+        <p>Dans la vue 3D de République, repérer un immeuble et son ombre au sol. À partir du tracé des rues, de la hauteur des bâtiments et de la position du soleil, on estime la longueur de rue à l’ombre à chaque heure.</p>
+        <p>Un bâtiment de hauteur inconnue ne projette aucune ombre dans le calcul. En été, nous ajoutons une estimation du couvert des arbres recensés. Le modèle suppose un ciel dégagé et mesure l’ombre des rues, pas la température ressentie.</p>
+        <p>Nous rattachons ensuite ces rues au point de station fourni par Île-de-France Mobilités. Une bouche de métro précise peut se trouver de l’autre côté du carrefour.</p>
+      </div>
+      <div data-for="trajet">
+        <p>Partons de République pour rejoindre Arts et Métiers le 25 juin à 16 h. Le tracé en pointillés est le plus court. Le trait plein montre le détour par les rues plus ombragées.</p>
+        <p>Lire les deux barres. Le trajet direct prend environ huit minutes, dont sept au soleil. L’autre en prend onze, dont trois au soleil. Le voyageur choisit si ce détour en vaut la peine.</p>
+        <p>Ces durées sont arrondies à la minute et reposent sur une marche à 4,5 km/h. Le gain dépend des rues et de l’heure de départ.</p>
+      </div>
+      <div data-for="demo">
+        <p>Ouvrir « Essayer ce trajet » depuis la fenêtre projetée. Le départ, la station, l’été et 16 h sont déjà sélectionnés. Montrer le tracé, les points d’eau et le réglage de l’heure.</p>
+        <p>Passer de la recherche d’ombre au chemin le plus court. On peut aussi chercher du soleil en hiver ou utiliser la carte à vélo. Les durées de l’outil utilisent une vitesse de 5 km/h à pied.</p>
+        <p>Revenir à l’onglet de présentation et poser la question aux aménageurs. Que gagnerait-on si les arbres grandissaient&nbsp;?</p>
+      </div>
+      <div data-for="demain">
+        <p>Nous faisons une seule hypothèse pour 2036. La couronne des jeunes arbres déjà recensés gagne deux mètres de rayon. Le bâti est conservé et aucune nouvelle plantation n’est ajoutée.</p>
+        <p>À 16 h, on passerait de {{lowShade}} à {{futureLow}} stations sous le seuil de 40 % d’ombre. Seulement {{moved}} stations atteindraient ou franchiraient ce seuil dans ce scénario.</p>
+        <p>Pour une collectivité, cela invite à regarder où planter, comment mieux signaler les fontaines et où placer les arrêts ou les accès pour profiter de l’ombre aux heures de passage.</p>
+      </div>
+      <div data-for="questions">
+        <p>Conclure en revenant à une station que le public connaît. Au même endroit, la part de rue à l’ombre peut beaucoup changer selon l’heure. Inviter quelqu’un à proposer sa station pour l’explorer ensemble.</p>
+        <p>Le récit donne les résultats à l’échelle de Paris. La carte permet d’essayer son propre trajet. Remercier le public et ouvrir les questions.</p>
+      </div>
+      <div data-for="ressources">
+        <p>Utiliser cette annexe si quelqu’un souhaite vérifier un chiffre. Le CSV donne la température maximale de chaque journée à Paris-Montsouris. Les méthodes, les licences et les autres jeux de données sont accessibles depuis le récit.</p>
+      </div>
+    </template>
+
+    <footer class="deck-footer deck-control" hidden>
+      <button class="contents-toggle" id="contents-toggle" type="button" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#contents"/></svg>Sommaire</button>
+      <nav class="progress" id="progress" aria-label="Accès direct aux diapositives"></nav>
+      <div class="slide-controls">
+        <span class="counter"><strong id="current">01</strong><span aria-hidden="true"> / </span><span id="total">09</span></span>
+        <button class="arrow" id="prev-slide" type="button" aria-label="Diapositive précédente" title="Précédente (←)"><svg aria-hidden="true"><use href="#previous"/></svg></button>
+        <button class="arrow" id="next-slide" type="button" aria-label="Diapositive suivante" title="Suivante (→)"><svg aria-hidden="true"><use href="#next"/></svg></button>
+      </div>
+    </footer>
+    <p class="sr-only" id="deck-status" role="status"></p>
+    <dialog id="contents-dialog" aria-labelledby="contents-title">
+      <div class="dialog-heading"><h2 id="contents-title">Sommaire</h2><form method="dialog"><button class="arrow" aria-label="Fermer le sommaire"><svg aria-hidden="true"><use href="#close"/></svg></button></form></div>
+      <ol id="slide-list"></ol>
+    </dialog>
+    <dialog id="notes-dialog" aria-labelledby="all-notes-title">
+      <div class="dialog-heading"><h2 id="all-notes-title">Toutes les notes</h2><form method="dialog"><button class="arrow" aria-label="Fermer les notes"><svg aria-hidden="true"><use href="#close"/></svg></button></form></div>
+      <div id="all-notes"></div>
+    </dialog>
+    <script type="module" src="./src/presentation.js"></script>
+  </body>
+</html>
